@@ -89,16 +89,23 @@ authRoutes.post('/login', async (c) => {
   });
 });
 
-authRoutes.get('/me', A.requireAuth, (c) => {
+authRoutes.get('/me', A.requireAuth, async (c) => {
+  const sessionUser = c.get('user') as unknown as Record<string, unknown>;
+  // Per-employee override, set by an admin. NULL — the default for every
+  // existing employee — falls back to the app-wide SELFIE_MODE setting, so
+  // this reports exactly what it always did unless an admin changed it.
+  const pref = await get<{ photo_policy: string | null }>(
+    'SELECT photo_policy FROM users WHERE id = ?', sessionUser.id as number,
+  );
   return c.json({
-    user: publicUser(c.get('user') as unknown as Record<string, unknown>),
+    user: publicUser(sessionUser),
     server_time: T.nowIso(),
     tz: { offset_min: config.tzOffsetMin, label: config.tzLabel },
     location_rules: {
       max_accuracy_m: config.maxAccuracyM,
       max_fix_age_sec: config.maxFixAgeSec,
       allow_out_of_fence: config.allowOutOfFenceWithFlag,
-      selfie_mode: config.selfieMode,
+      selfie_mode: pref?.photo_policy || config.selfieMode,
     },
   });
 });

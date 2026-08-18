@@ -92,6 +92,12 @@ meRoutes.get('/status', async (c) => {
   const openRec = await AT.openRecord(user.id);
   const target = await AT.resolvePunchTarget(user.id, nowIso);
   const localNow = T.local(nowIso);
+  // Per-employee override, set by an admin. NULL — the default for every
+  // existing employee — falls back to the app-wide SELFIE_MODE setting, so
+  // this reports exactly what it always did unless an admin changed it.
+  const photoPref = await get<{ photo_policy: string | null }>(
+    'SELECT photo_policy FROM users WHERE id = ?', user.id,
+  );
 
   const todaySchedule = await get<Record<string, unknown>>(
     `SELECT s.*, sh.name AS shift_name, sh.start_time, sh.end_time,
@@ -122,7 +128,7 @@ meRoutes.get('/status', async (c) => {
     location_rules: {
       max_accuracy_m: config.maxAccuracyM,
       max_fix_age_sec: config.maxFixAgeSec,
-      selfie_mode: config.selfieMode,
+      selfie_mode: photoPref?.photo_policy || config.selfieMode,
     },
     can_check_in: !openRec && target.ok,
     can_check_out: !!openRec,

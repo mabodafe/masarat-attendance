@@ -78,6 +78,10 @@ adminRoutes.get('/users', async (c) => {
     users: rows.map((u) => ({
       ...publicUser(u), active: !!u.active, project_count: u.project_count,
       manager_name: u.manager_name, reports_count: u.reports_count, created_at: u.created_at,
+      // Per-employee overrides (see routes/admin.ts PATCH /users/:id below).
+      // photo_policy is null for every employee until an admin sets it.
+      photo_policy: (u.photo_policy ?? null) as string | null,
+      flexible_punch: !!u.flexible_punch,
     })),
   });
 });
@@ -165,6 +169,17 @@ adminRoutes.patch('/users/:id', adminOnly, async (c) => {
   }
   if (b.manager_id !== undefined) { sets.push('manager_id = ?'); vals.push(int(b.manager_id) || null); }
   if (b.active !== undefined) { sets.push('active = ?'); vals.push(b.active ? 1 : 0); }
+  // Per-employee overrides. photo_policy of '' or null means "inherit the
+  // app-wide SELFIE_MODE setting"; flexible_punch lets this one employee
+  // check in/out at any time instead of only inside their shift's window.
+  if (b.photo_policy !== undefined) {
+    const pp = b.photo_policy === '' ? null : b.photo_policy;
+    if (pp !== null && !['off', 'optional', 'required'].includes(pp as string)) {
+      return c.json({ error: 'photo_policy must be off, optional, required, or blank to use the default.' }, 400);
+    }
+    sets.push('photo_policy = ?'); vals.push(pp);
+  }
+  if (b.flexible_punch !== undefined) { sets.push('flexible_punch = ?'); vals.push(b.flexible_punch ? 1 : 0); }
   if (b.password) {
     if (String(b.password).length < 8) return c.json({ error: 'Password must be at least 8 characters.' }, 400);
     sets.push('password_hash = ?', 'must_change_password = 1');
