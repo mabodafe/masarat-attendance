@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="Masarat">
+  <title>Masarat</title>
+  <!-- Maskable variant: full-bleed background with the mark inside the safe
+       zone, so a launcher can crop it to a circle or squircle without clipping. -->
+  <rect width="256" height="256" fill="#ffffff"/>
+  <g transform="translate(51.2 51.2) scale(0.6)">
+    <rect x="64" y="0" width="192" height="192" fill="#E31E24"/>
+    <rect x="0" y="64" width="192" height="192" fill="#101418"/>
+    <path fill="#fff" d="M56 200 L56 48 L90.6 48 L128 111.8 L165.4 48 L200 48 L200 200
+                         L165.4 200 L165.4 108.8 L128 166.6 L90.6 108.8 L90.6 200 Z"/>
+  </g>
+</svg>

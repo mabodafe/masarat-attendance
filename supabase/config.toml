@@ -1,0 +1,7 @@
+project_id = "masarat-attendance"
+
+[functions.api]
+# Our tokens are this application's own HS256 JWTs, not Supabase JWTs, so Supabase
+# must not try to verify them. Authentication and role checks are enforced by the
+# application on every route (see api/lib/auth.ts).
+verify_jwt = false

@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#101418">
+<title>Masarat · Attendance</title>
+<link rel="icon" href="logo.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="logo.svg">
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- ============================ SIGN IN ============================ -->
+<section id="loginView" class="app hidden">
+  <main style="padding-top:2.4rem">
+    <div class="center">
+      <img src="logo.svg" alt="" class="logo lg" style="margin:0 auto .8rem">
+      <div class="wordmark lg">Masarat</div>
+      <div class="brandline" style="margin:.35rem 0 1rem">مسارات التطوير للمقاولات</div>
+      <h1 data-i18n="appName">Site Attendance</h1>
+      <p class="muted small" data-i18n="loginHint">Sign in with the employee ID or email your HR administrator gave you.</p>
+    </div>
+    <form class="card" id="loginForm" autocomplete="on">
+      <div class="field">
+        <label for="identifier" data-i18n="employeeIdOrEmail">Employee ID or email</label>
+        <input id="identifier" name="username" autocomplete="username" required>
+      </div>
+      <div class="field">
+        <label for="password" data-i18n="password">Password</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required>
+      </div>
+      <div id="loginError" class="notice bad hidden" style="margin-bottom:.7rem"></div>
+      <button class="primary big" type="submit" data-i18n="signIn">Sign in</button>
+    </form>
+    <div class="center small">
+      <button class="ghost slim" id="langBtnLogin">العربية / English</button>
+    </div>
+  </main>
+</section>
+
+<!-- ======================= CHANGE PASSWORD ========================= -->
+<section id="pwdView" class="app hidden">
+  <header class="bar"><span class="brand" data-i18n="setPassword">Set your password</span></header>
+  <main>
+    <div class="notice warn" data-i18n="pwdFirstHint">
+      This is your first sign-in. Choose your own password before you continue.
+    </div>
+    <form class="card" id="pwdForm">
+      <div class="field">
+        <label for="curPwd" data-i18n="currentPassword">Current / temporary password</label>
+        <input id="curPwd" type="password" autocomplete="current-password" required>
+      </div>
+      <div class="field">
+        <label for="newPwd" data-i18n="newPassword">New password (8 characters or more)</label>
+        <input id="newPwd" type="password" autocomplete="new-password" minlength="8" required>
+      </div>
+      <div class="field">
+        <label for="newPwd2" data-i18n="repeatPassword">Repeat new password</label>
+        <input id="newPwd2" type="password" autocomplete="new-password" minlength="8" required>
+      </div>
+      <div id="pwdError" class="notice bad hidden" style="margin-bottom:.7rem"></div>
+      <button class="primary" type="submit" data-i18n="savePassword">Save password</button>
+    </form>
+  </main>
+</section>
+
+<!-- ============================== APP ============================== -->
+<section id="mainView" class="app hidden">
+  <header class="bar">
+    <span class="brand"><img src="logo.svg" alt="Masarat" class="logo"></span>
+    <div>
+      <div id="hdrName" style="font-weight:600"></div>
+      <div class="small muted" id="hdrRole"></div>
+    </div>
+    <div class="who">
+      <div class="mono" id="hdrClock" style="font-weight:700"></div>
+      <div class="small muted" id="hdrTz"></div>
+    </div>
+  </header>
+
+  <!-- ---------- TAB: punch ---------- -->
+  <main id="tabPunch">
+    <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <div>
+          <div class="small muted" id="punchDateLabel"></div>
+          <div class="bigclock mono" id="punchClock">--:--</div>
+        </div>
+        <div class="center">
+          <div class="statusline"><span class="dot" id="stateDot"></span><span id="stateText" data-i18n="loading">Loading…</span></div>
+          <div class="small muted" id="stateSub"></div>
+        </div>
+      </div>
+      <div id="shiftBox" class="notice" style="margin-top:.8rem"></div>
+    </div>
+
+    <!-- step 1: location -->
+    <div class="card">
+      <h2><span data-i18n="step1">Step 1 · Your location</span></h2>
+      <p class="small muted" data-i18n="gpsHint">
+        Turn on GPS / Location on your phone, then press the button. The reading must be
+        fresh and accurate, and you must be standing inside the site boundary.
+      </p>
+      <button class="primary" id="btnLocate"><span data-i18n="getLocation">Get my current location</span></button>
+      <div id="fixBox" class="hidden" style="margin-top:.8rem">
+        <div class="kv"><span data-i18n="accuracy">Accuracy</span><b class="mono" id="fixAcc">—</b></div>
+        <div class="kv"><span data-i18n="fixAge">Reading age</span><b class="mono" id="fixAge">—</b></div>
+        <div class="kv"><span data-i18n="coords">Coordinates</span><b class="mono small" id="fixCoords">—</b></div>
+        <div class="gauge" style="margin-top:.6rem"><i id="accGauge" style="width:0%"></i></div>
+      </div>
+      <div id="fixError" class="notice bad hidden" style="margin-top:.8rem"></div>
+    </div>
+
+    <!-- step 2: project -->
+    <div class="card">
+      <h2><span data-i18n="step2">Step 2 · Where are you working?</span></h2>
+      <div class="field">
+        <label for="projectSel" data-i18n="projectSite">Project / site you are attending</label>
+        <select id="projectSel"></select>
+      </div>
+      <div id="projInfo" class="small muted"></div>
+      <div class="field" style="margin-top:.7rem">
+        <label for="noteBox" data-i18n="noteOptional">Note (optional) — gate, building, task…</label>
+        <textarea id="noteBox" maxlength="500"></textarea>
+      </div>
+    </div>
+
+    <!-- step 2b: selfie (hidden when the policy is "off") -->
+    <div class="card hidden" id="photoCard">
+      <h2><span data-i18n="photoStep">Photo</span> <span class="pill" id="photoPolicyPill"></span></h2>
+      <p class="small muted" id="photoHint"></p>
+      <!-- A capture-enabled file input opens the phone camera directly, which is
+           far more reliable across mobile browsers than a getUserMedia preview. -->
+      <input type="file" id="photoInput" accept="image/jpeg,image/png,image/*" capture="user" class="hidden">
+      <button class="ghost" id="btnPhoto"><span data-i18n="takePhoto">Take photo</span></button>
+      <div id="photoPreview" class="hidden" style="margin-top:.7rem">
+        <img id="photoImg" alt="" style="width:100%;max-height:220px;object-fit:cover;border-radius:12px;border:1px solid var(--line)">
+        <div class="row" style="margin-top:.5rem">
+          <span class="pill ok grow" id="photoSize"></span>
+          <button class="ghost slim" id="btnPhotoClear" data-i18n="removePhoto">Remove</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- step 3: punch -->
+    <div class="card">
+      <h2><span data-i18n="step3">Step 3 · Record your time</span></h2>
+      <button class="ok big" id="btnIn" disabled><span data-i18n="checkIn">Check in</span></button>
+      <button class="bad big" id="btnOut" disabled style="margin-top:.6rem"><span data-i18n="checkOut">Check out</span></button>
+      <div id="punchResult" class="notice hidden" style="margin-top:.8rem"></div>
+    </div>
+  </main>
+
+  <!-- ---------- TAB: calendar ---------- -->
+  <main id="tabCalendar" class="hidden">
+    <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <button class="ghost slim" id="calPrev">‹</button>
+        <b id="calTitle" class="mono"></b>
+        <button class="ghost slim" id="calNext">›</button>
+      </div>
+      <div class="cal" id="calGrid" style="margin-top:.7rem"></div>
+      <div class="row small muted" style="margin-top:.7rem">
+        <span><span class="pill info" data-i18n="work">Work</span></span>
+        <span><span class="pill" data-i18n="off">Off</span></span>
+        <span><span class="pill warn" data-i18n="leave">Leave</span></span>
+        <span><span class="pill bad" data-i18n="holiday">Holiday</span></span>
+        <span><span class="pill ok">✓</span> <span data-i18n="attended">attended</span></span>
+      </div>
+    </div>
+    <div class="card" id="calDayCard">
+      <h2 data-i18n="dayDetails">Day details</h2>
+      <div id="calDayBody" class="small muted" data-i18n="tapDay">Tap a day to see the shift and your recorded time.</div>
+    </div>
+  </main>
+
+  <!-- ---------- TAB: history ---------- -->
+  <main id="tabHistory" class="hidden">
+    <div class="card">
+      <div class="row">
+        <div class="grow"><label data-i18n="from">From</label><input type="date" id="hFrom"></div>
+        <div class="grow"><label data-i18n="to">To</label><input type="date" id="hTo"></div>
+      </div>
+      <button class="primary" id="hLoad" style="margin-top:.6rem" data-i18n="show">Show</button>
+    </div>
+    <div class="stats" id="hTotals"></div>
+    <div class="card flush"><div class="tablewrap"><table id="hTable"></table></div></div>
+  </main>
+
+  <!-- ---------- TAB: leave ---------- -->
+  <main id="tabLeave" class="hidden">
+    <div class="card">
+      <h2 data-i18n="requestLeave">Request leave</h2>
+      <form id="leaveForm">
+        <div class="field">
+          <label for="lvType" data-i18n="leaveType">Type of leave</label>
+          <select id="lvType"></select>
+        </div>
+        <div class="row">
+          <div class="grow"><label data-i18n="from">From</label><input type="date" id="lvFrom" required></div>
+          <div class="grow"><label data-i18n="to">To</label><input type="date" id="lvTo" required></div>
+        </div>
+        <div class="field" style="margin-top:.6rem">
+          <label for="lvReason" data-i18n="reason">Reason (optional)</label>
+          <textarea id="lvReason" maxlength="500"></textarea>
+        </div>
+        <div id="lvError" class="notice bad hidden" style="margin-bottom:.7rem"></div>
+        <button class="primary" type="submit" data-i18n="submitRequest">Submit request</button>
+      </form>
+    </div>
+    <div class="card">
+      <h2 data-i18n="myRequests">My requests</h2>
+      <div id="lvList"></div>
+    </div>
+  </main>
+
+  <!-- ---------- TAB: me ---------- -->
+  <main id="tabMe" class="hidden">
+    <div class="card">
+      <h2 data-i18n="myProfile">My profile</h2>
+      <div id="meBody"></div>
+    </div>
+    <div class="card">
+      <h2 data-i18n="language">Language</h2>
+      <button class="ghost" id="langBtn">العربية / English</button>
+    </div>
+    <div class="card">
+      <h2 data-i18n="changePassword">Change password</h2>
+      <form id="pwdForm2">
+        <div class="field"><label data-i18n="currentPassword">Current password</label><input id="cur2" type="password" required></div>
+        <div class="field"><label data-i18n="newPassword">New password</label><input id="new2" type="password" minlength="8" required></div>
+        <button class="primary" type="submit" data-i18n="savePassword">Save password</button>
+      </form>
+    </div>
+    <div class="card">
+      <a href="admin.html" id="adminLink" class="hidden"><button class="ghost" data-i18n="openAdmin">Open admin console</button></a>
+      <button class="bad" id="btnLogout" style="margin-top:.5rem" data-i18n="signOut">Sign out</button>
+    </div>
+  </main>
+
+  <nav class="tabs">
+    <button data-tab="Punch" class="active"><span class="ic">📍</span><span data-i18n="tabPunch">Check in/out</span></button>
+    <button data-tab="Calendar"><span class="ic">🗓️</span><span data-i18n="tabCalendar">Calendar</span></button>
+    <button data-tab="History"><span class="ic">📊</span><span data-i18n="tabHistory">My hours</span></button>
+    <button data-tab="Leave"><span class="ic">🌴</span><span data-i18n="tabLeave">Leave</span></button>
+    <button data-tab="Me"><span class="ic">👤</span><span data-i18n="tabMe">Me</span></button>
+  </nav>
+</section>
+
+<script src="i18n.js"></script>
+<script src="api.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+{
+  "name": "Masarat Site Attendance",
+  "short_name": "Masarat",
+  "description": "GPS-verified check-in and check-out for Masarat site employees",
+  "lang": "ar",
+  "dir": "auto",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#101418",
+  "theme_color": "#101418",
+  "icons": [
+    { "src": "logo.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "logo-maskable.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}

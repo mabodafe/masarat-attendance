@@ -1,0 +1,114 @@
+name: deploy
+
+# Deploys the API to Supabase Edge Functions and applies database migrations.
+#
+# CREDENTIAL BOUNDARY: the Supabase access token and database password live ONLY in
+# this repository's GitHub Secrets. You set them yourself in the GitHub UI; they are
+# never pasted into a chat, a file, or a log.
+#
+# Required repository secrets:
+#   SUPABASE_ACCESS_TOKEN   Supabase account -> Access Tokens -> generate
+#   SUPABASE_PROJECT_REF    the project ref, e.g. abcdefghijkl
+#   SUPABASE_DB_PASSWORD    the database password you chose when creating the project
+#
+# The gate: this workflow runs the 122-check suite against a throwaway Postgres and
+# REFUSES TO DEPLOY if a single check fails.
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: 122-check acceptance suite
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: masarat
+          POSTGRES_PASSWORD: ci-local-only
+          POSTGRES_DB: masarat_ci
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Type check
+        run: deno check api/index.ts scripts/seed.ts scripts/import-masarat.ts test/run.ts
+
+      - name: Data layer checks
+        run: deno run -A test/db_layer_test.ts
+        env:
+          DATABASE_URL: postgres://masarat:ci-local-only@localhost:5432/masarat_ci
+          JWT_SECRET: ci-only-secret-with-enough-variety-Xq7Zk29Lm4
+      - name: Auth slice checks
+        run: deno run -A test/auth_slice_test.ts
+        env:
+          DATABASE_URL: postgres://masarat:ci-local-only@localhost:5432/masarat_ci
+          JWT_SECRET: ci-only-secret-with-enough-variety-Xq7Zk29Lm4
+
+      - name: Open-attendance policy checks
+        run: deno run -A test/open_attendance_policy_test.ts
+        env:
+          DATABASE_URL: postgres://masarat:ci-local-only@localhost:5432/masarat_ci
+          JWT_SECRET: ci-only-secret-with-enough-variety-Xq7Zk29Lm4
+          ALLOW_OUT_OF_FENCE_WITH_FLAG: 'true'
+
+      - name: THE GATE — 122 end-to-end checks
+        run: deno run -A test/run.ts
+        env:
+          DATABASE_URL: postgres://masarat:ci-local-only@localhost:5432/masarat_ci
+          JWT_SECRET: ci-only-secret-with-enough-variety-Xq7Zk29Lm4
+
+      - name: Assert the suite did not write into a live photo directory
+        run: |
+          for d in data/photos .local-photos; do
+            if [ -d "$d" ]; then echo "::error::the suite wrote into $d"; ls -la "$d"; exit 1; fi
+          done
+          echo "no live-data pollution"
+
+  deploy:
+    name: Deploy to Supabase
+    needs: test          # <- the gate. No green suite, no deploy.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Link the project
+        run: supabase link --project-ref "$SUPABASE_PROJECT_REF" --password "$SUPABASE_DB_PASSWORD"
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+
+      - name: Apply database migrations
+        run: supabase db push --password "$SUPABASE_DB_PASSWORD"
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+
+      # --no-verify-jwt is REQUIRED: our tokens are this app's own HS256 JWTs, not
+      # Supabase JWTs. The app still enforces requireAuth + requireRole on every route.
+      - name: Deploy the api function
+        run: supabase functions deploy api --no-verify-jwt
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Smoke test the deployed function
+        run: |
+          URL="https://${{ secrets.SUPABASE_PROJECT_REF }}.supabase.co/functions/v1/api/api/health"
+          code=$(curl -s -o /tmp/health.json -w '%{http_code}' "$URL")
+          echo "health: $code"; cat /tmp/health.json
+          test "$code" = "200"
+          grep -q 'Asia/Riyadh' /tmp/health.json

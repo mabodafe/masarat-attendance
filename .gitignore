@@ -1,0 +1,6 @@
+﻿# runtime / local only
+.local-photos/
+data/
+*.log
+.env
+.DS_Store

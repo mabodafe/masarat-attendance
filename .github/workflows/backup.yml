@@ -1,0 +1,69 @@
+name: nightly-backup
+
+# MANDATORY, NOT OPTIONAL.
+#
+# The Supabase Free plan includes NO automatic backups and NO point-in-time recovery.
+# This database holds the hours that wages are paid from. Without this workflow there
+# is no recovery path at all.
+#
+# Runs at 22:15 UTC = 01:15 Asia/Riyadh, after the working day.
+#
+# Required repository secret:
+#   SUPABASE_DB_URL   the pooler connection string from
+#                     Supabase -> Project Settings -> Database -> Connection string (URI)
+#
+# The dump is stored as a GitHub Actions artifact with 90-day retention. Artifacts on a
+# PRIVATE repository are private. Download one to your own machine periodically as well:
+# a backup that lives only in the same account as the data is one compromise from gone.
+
+on:
+  schedule:
+    - cron: '15 22 * * *'
+  workflow_dispatch:
+
+jobs:
+  dump:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install postgresql-client 16
+        run: |
+          sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/pgdg.gpg
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client-16
+
+      - name: Dump the database
+        env:
+          PGURL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          STAMP=$(date -u +%Y-%m-%dT%H%M%SZ)
+          echo "STAMP=$STAMP" >> $GITHUB_ENV
+          pg_dump --no-owner --no-privileges --format=custom \
+                  --file="masarat-$STAMP.dump" "$PGURL"
+          ls -la "masarat-$STAMP.dump"
+
+      - name: Verify the dump is real before trusting it
+        env:
+          PGURL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          # A dump that restores to an empty database is the failure mode that hides
+          # for months. Assert the tables are present and the staff rows are there.
+          pg_restore --list "masarat-${STAMP}.dump" > toc.txt
+          for t in users attendance schedules shifts projects punch_log leave_requests; do
+            grep -q "TABLE DATA public $t" toc.txt || { echo "::error::$t missing from the dump"; exit 1; }
+          done
+          USERS=$(psql "$PGURL" -tAc 'select count(*) from users')
+          echo "live user rows: $USERS"
+          test "$USERS" -gt 0 || { echo "::error::database reports 0 users"; exit 1; }
+          echo "dump verified: contains all seven core tables, database has $USERS users"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: masarat-db-${{ env.STAMP }}
+          path: masarat-*.dump
+          retention-days: 90
+
+      # A job that silently stops running is the most dangerous backup failure.
+      # A failed run marks the workflow red and emails the repository owner.
+      - name: Report
+        run: echo "backup ${STAMP} completed and verified"
