@@ -569,9 +569,17 @@
         ['Needs review', out.totals.flagged],
       ].map(([l, n]) => `<div class="stat"><div class="n">${esc(n)}</div><div class="l">${esc(l)}</div></div>`).join('');
 
+      // A day with more than one check-in/out pair (the employee checked
+      // out and came back) still shows as ONE row with the day's total —
+      // the individual sessions are a small expandable detail underneath,
+      // not extra top-level rows.
       $('#repTable').innerHTML = table(
-        ['Date', 'Employee', 'Shift', 'Project', 'In', 'Out', 'Worked', 'Late', 'OT', 'In dist.', 'Acc.', 'Photo', 'Flags', ''],
-        out.records.map((r) => `<tr>
+        ['', 'Date', 'Employee', 'Shift', 'Project', 'In', 'Out', 'Worked', 'Late', 'OT', 'In dist.', 'Acc.', 'Photo', 'Flags', ''],
+        out.records.flatMap((r) => {
+          const sessions = Array.isArray(r.sessions) ? r.sessions : [];
+          const multi = sessions.length > 1;
+          const mainRow = `<tr>
+          <td>${multi ? `<button class="ghost slim" data-toggle-sessions="${r.id}" title="Show individual sessions">▾ ${sessions.length}</button>` : ''}</td>
           <td class="mono">${esc(r.work_date)}</td>
           <td>${esc(r.full_name)}<div class="small muted mono">${esc(r.employee_code)}</div></td>
           <td>${esc(r.shift_name || '—')}</td>
@@ -590,12 +598,31 @@
           </td>
           <td>${pills(r.flags)}</td>
           <td>${state.canEdit ? `<button class="ghost slim" data-fix="${r.id}">Correct</button>` : ''}</td>
-        </tr>`));
+        </tr>`;
+          const detailRow = multi ? `<tr class="hidden" data-sessions-row="${r.id}">
+          <td></td>
+          <td colspan="13">
+            <div class="tablewrap"><table><thead><tr>
+              <th>#</th><th>In</th><th>Out</th><th>Worked</th>
+            </tr></thead><tbody>${sessions.map((s) => `<tr>
+              <td>${esc(s.seq)}</td>
+              <td class="mono">${esc(s.check_in_local)}</td>
+              <td class="mono">${esc(s.check_out_local || '—')}</td>
+              <td class="mono">${esc(hm(s.worked_minutes))}</td>
+            </tr>`).join('')}</tbody></table></div>
+          </td>
+        </tr>` : '';
+          return [mainRow, detailRow].filter(Boolean);
+        }));
       $$('[data-fix]').forEach((b) => b.onclick = () =>
         correctionModal(out.records.find((r) => r.id === Number(b.dataset.fix))));
       $$('[data-photo]').forEach((b) => b.onclick = () => {
         const [id, kind] = b.dataset.photo.split('|');
         showPhoto(id, kind, out.records.find((r) => r.id === Number(id)));
+      });
+      $$('[data-toggle-sessions]').forEach((b) => b.onclick = () => {
+        const row = $(`[data-sessions-row="${b.dataset.toggleSessions}"]`);
+        if (row) row.classList.toggle('hidden');
       });
     } catch (ex) { toast(ex.message, 'bad'); }
   }
