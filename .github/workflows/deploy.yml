@@ -124,10 +124,22 @@ jobs:
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
+      # Supabase's CLI reports the function deployed as soon as the upload finishes, but
+      # the edge network takes a few seconds to actually route to the new version — a
+      # request right after "deploy" reports success can still 404 with "Unknown
+      # endpoint" against the OLD (or not-yet-live) routing table. That is a propagation
+      # delay, not a real failure, so retry with backoff instead of failing on the first
+      # miss. Only fail the job if it is still unhealthy after this window.
       - name: Smoke test the deployed function
         run: |
           URL="https://${{ secrets.SUPABASE_PROJECT_REF }}.supabase.co/functions/v1/api/api/health"
-          code=$(curl -s -o /tmp/health.json -w '%{http_code}' "$URL")
-          echo "health: $code"; cat /tmp/health.json
-          test "$code" = "200"
-          grep -q 'Asia/Riyadh' /tmp/health.json
+          for attempt in 1 2 3 4 5 6; do
+            code=$(curl -s -o /tmp/health.json -w '%{http_code}' "$URL")
+            echo "attempt $attempt: health: $code"; cat /tmp/health.json; echo
+            if [ "$code" = "200" ] && grep -q 'Asia/Riyadh' /tmp/health.json; then
+              echo "healthy"; exit 0
+            fi
+            sleep 5
+          done
+          echo "::error::function never became healthy after 6 attempts"
+          exit 1
