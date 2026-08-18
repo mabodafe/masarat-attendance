@@ -434,12 +434,61 @@ export async function checkIn(
 
   // SQLite allowed `shift_id IS ?` as null-safe equality. Postgres requires
   // IS NOT DISTINCT FROM — same semantics, including a NULL shift_id.
-  const existing = await get<{ id: number }>(
-    'SELECT id FROM attendance WHERE user_id = ? AND work_date = ? AND shift_id IS NOT DISTINCT FROM ?',
+  const existing = await get<Record<string, unknown>>(
+    'SELECT * FROM attendance WHERE user_id = ? AND work_date = ? AND shift_id IS NOT DISTINCT FROM ?',
     user.id,
     w.workDate,
     w.shift.id,
   );
+
+  // A CLOSED record for this exact shift/day means the employee checked out
+  // earlier and is now back to continue the SAME shift occurrence: reopen it
+  // and keep accumulating worked minutes across sessions, instead of
+  // refusing with "already recorded". late_minutes is left untouched — it is
+  // pinned to the very first check-in of the day for this shift, forever.
+  // An AUTO_CLOSED record (the system closed it because the employee never
+  // checked out) is deliberately NOT reopened here: that needs an admin's
+  // eyes, not a silent reopen, so it falls through to the unchanged reject
+  // below exactly as it always has.
+  if (existing && existing.status === 'closed') {
+    const pic = await handlePhoto(photo, { userId: user.id, kind: 'in' });
+    if (!pic.ok) return await reject(pic.code!, pic.error!, v.distance);
+    if (pic.name) flags.add('photo_captured');
+    for (const f of JSON.parse((existing.flags as string) || '[]')) flags.add(f as string);
+
+    const seqRow = await get<{ next: number }>(
+      'SELECT COALESCE(MAX(seq), 0) + 1 AS next FROM attendance_sessions WHERE attendance_id = ?',
+      existing.id,
+    );
+    await run(
+      `INSERT INTO attendance_sessions
+         (attendance_id, seq, check_in_at, check_in_lat, check_in_lng, check_in_accuracy,
+          check_in_distance_m, check_in_device, check_in_note, check_in_photo, created_at, updated_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+      existing.id, seqRow?.next ?? 1, nowIso, v.lat, v.lng, v.accuracy, v.distance,
+      userAgent || null, note || null, pic.name, nowIso, nowIso,
+    );
+    await run(
+      `UPDATE attendance SET status = 'open', flags = ?, updated_at = ? WHERE id = ?`,
+      JSON.stringify([...flags]), nowIso, existing.id,
+    );
+
+    await logPunch({ ...base, outcome: 'accepted', reason: null, distance_m: v.distance ?? null });
+    return {
+      ok: true,
+      attendance_id: existing.id,
+      work_date: w.workDate,
+      shift: { id: w.shift.id, name: w.shift.name, start_time: w.shift.start_time, end_time: w.shift.end_time },
+      project: { id: project.id, name: project.name },
+      check_in_at: nowIso,
+      check_in_local: T.local(nowIso).hhmm,
+      distance_m: v.distance,
+      accuracy_m: Math.round(v.accuracy!),
+      late_minutes: existing.late_minutes as number,
+      resumed: true,
+      flags: [...flags],
+    };
+  }
   if (existing) {
     return await reject('already_recorded', 'This shift is already recorded for today.');
   }
@@ -460,11 +509,22 @@ export async function checkIn(
     userAgent || null, note || null, pic.name, lateMinutes,
     JSON.stringify([...flags]), nowIso, nowIso,
   );
+  const attendanceId = Number(info.lastInsertRowid);
+
+  // Session 1 of this attendance row — see attendance_sessions in the schema.
+  await run(
+    `INSERT INTO attendance_sessions
+       (attendance_id, seq, check_in_at, check_in_lat, check_in_lng, check_in_accuracy,
+        check_in_distance_m, check_in_device, check_in_note, check_in_photo, created_at, updated_at)
+     VALUES (?,1,?,?,?,?,?,?,?,?,?,?)`,
+    attendanceId, nowIso, v.lat, v.lng, v.accuracy, v.distance,
+    userAgent || null, note || null, pic.name, nowIso, nowIso,
+  );
 
   await logPunch({ ...base, outcome: 'accepted', reason: null, distance_m: v.distance ?? null });
   return {
     ok: true,
-    attendance_id: Number(info.lastInsertRowid),
+    attendance_id: attendanceId,
     work_date: w.workDate,
     shift: { id: w.shift.id, name: w.shift.name, start_time: w.shift.start_time, end_time: w.shift.end_time },
     project: { id: project.id, name: project.name },
@@ -528,12 +588,63 @@ export async function checkOut(
     if (overtime > 0) flags.add('overtime');
   }
 
-  const gross = T.minutesBetween(rec.check_in_at as string, nowIso);
-  if (gross < 1) return await reject('too_soon', 'Too soon after check-in. Wait a minute and try again.');
-  const worked = Math.max(0, gross - (shift?.break_min || 0));
+  // The still-open session for this attendance row: the one opened by the
+  // most recent check-in (session 1 the first time through this shift/day, a
+  // later seq if the employee checked out and came back). checkIn() creates
+  // a session row on every check-in, so this is normally always found; the
+  // fallback below only covers a record whose session 1 predates this
+  // feature (already open at the moment this shipped).
+  const session = await get<Record<string, unknown>>(
+    `SELECT * FROM attendance_sessions
+      WHERE attendance_id = ? AND check_out_at IS NULL
+      ORDER BY seq DESC LIMIT 1`,
+    rec.id,
+  );
+  const sessionCheckInAt = (session?.check_in_at as string) || (rec.check_in_at as string);
+
+  // "Too soon" is judged against THIS session's own check-in, not the first
+  // check-in of the day — otherwise a re-check-in hours into a later session
+  // would never trip this guard.
+  const sessionGross = T.minutesBetween(sessionCheckInAt, nowIso);
+  if (sessionGross < 1) return await reject('too_soon', 'Too soon after check-in. Wait a minute and try again.');
 
   const pic = await handlePhoto(photo, { userId: user.id, kind: 'out' });
   if (!pic.ok) return await reject(pic.code!, pic.error!, v.distance);
+
+  if (session) {
+    await run(
+      `UPDATE attendance_sessions SET
+         check_out_at = ?, check_out_lat = ?, check_out_lng = ?, check_out_accuracy = ?,
+         check_out_distance_m = ?, check_out_device = ?, check_out_note = ?, check_out_project_id = ?,
+         check_out_photo = ?, worked_minutes = ?, updated_at = ?
+       WHERE id = ?`,
+      nowIso, v.lat, v.lng, v.accuracy, v.distance, userAgent || null, note || null, project.id,
+      pic.name, sessionGross, nowIso, session.id,
+    );
+  } else {
+    // Back-fill session 1 from the attendance row itself, so the sum below
+    // is still correct for a record that was already open before this
+    // feature shipped (and therefore never got a session row at check-in).
+    await run(
+      `INSERT INTO attendance_sessions
+         (attendance_id, seq, check_in_at, check_in_lat, check_in_lng, check_in_accuracy,
+          check_in_distance_m, check_in_device, check_in_note, check_in_photo,
+          check_out_at, check_out_lat, check_out_lng, check_out_accuracy, check_out_distance_m,
+          check_out_device, check_out_note, check_out_photo, check_out_project_id,
+          worked_minutes, created_at, updated_at)
+       VALUES (?,1,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      rec.id, rec.check_in_at, rec.check_in_lat, rec.check_in_lng, rec.check_in_accuracy,
+      rec.check_in_distance_m, rec.check_in_device, rec.check_in_note, rec.check_in_photo,
+      nowIso, v.lat, v.lng, v.accuracy, v.distance, userAgent || null, note || null, pic.name, project.id,
+      sessionGross, nowIso, nowIso,
+    );
+  }
+
+  const sumRow = await get<{ total: number }>(
+    'SELECT COALESCE(SUM(worked_minutes), 0) AS total FROM attendance_sessions WHERE attendance_id = ?',
+    rec.id,
+  );
+  const worked = Math.max(0, (sumRow?.total ?? sessionGross) - (shift?.break_min || 0));
 
   await run(
     `UPDATE attendance SET
