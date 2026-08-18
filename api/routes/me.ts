@@ -253,7 +253,7 @@ meRoutes.get('/attendance', async (c) => {
   const today = T.local().date;
   const from = T.isYmd(c.req.query('from')) ? c.req.query('from') as string : `${today.slice(0, 7)}-01`;
   const to = T.isYmd(c.req.query('to')) ? c.req.query('to') as string : today;
-  const rows = (await all<Record<string, unknown>>(
+  const rows = await attachSessions((await all<Record<string, unknown>>(
     `SELECT a.*, p.name AS project_name, sh.name AS shift_name
        FROM attendance a
        JOIN projects p ON p.id = a.project_id
@@ -261,7 +261,7 @@ meRoutes.get('/attendance', async (c) => {
       WHERE a.user_id = ? AND a.work_date BETWEEN ? AND ?
       ORDER BY a.work_date DESC, a.check_in_at DESC`,
     user.id, from, to,
-  )).map(shapeAttendance);
+  )).map(shapeAttendance));
 
   const totals = rows.reduce(
     (acc, r) => {
@@ -297,7 +297,42 @@ export function shapeAttendance(a: Record<string, unknown>) {
     has_in_photo: !!a.check_in_photo,
     has_out_photo: !!a.check_out_photo,
     flags: JSON.parse((a.flags as string) || '[]'),
+    sessions: undefined as unknown, // filled in by attachSessions(), when the caller wants it
   };
+}
+
+// NEW (not part of the original SQLite app): the admin's owner chose "merge
+// into one daily total, sessions listed underneath" for the multi-session
+// check-in/out feature — this fills that in. Mutates each shaped record's
+// `sessions` array in place with one entry per check-in/out pair, in order,
+// and returns the same array for convenience. A record with exactly one
+// session (the common case, unchanged from before this feature) still gets
+// a one-item sessions array, so the admin UI can render the same way either way.
+export async function attachSessions<T extends { id: unknown; sessions: unknown }>(records: T[]): Promise<T[]> {
+  const ids = records.map((r) => Number(r.id)).filter((n) => Number.isFinite(n));
+  if (!ids.length) return records;
+  const placeholders = ids.map(() => '?').join(',');
+  const rows = await all<Record<string, unknown>>(
+    `SELECT * FROM attendance_sessions WHERE attendance_id IN (${placeholders}) ORDER BY attendance_id, seq`,
+    ...ids,
+  );
+  const byAttendance = new Map<number, Record<string, unknown>[]>();
+  for (const s of rows) {
+    const key = Number(s.attendance_id);
+    const shaped = {
+      seq: s.seq,
+      check_in_at: s.check_in_at,
+      check_in_local: T.local(s.check_in_at as string).hhmm,
+      check_out_at: s.check_out_at,
+      check_out_local: s.check_out_at ? T.local(s.check_out_at as string).hhmm : null,
+      worked_minutes: s.worked_minutes,
+      note: s.check_in_note || s.check_out_note || null,
+    };
+    if (!byAttendance.has(key)) byAttendance.set(key, []);
+    byAttendance.get(key)!.push(shaped);
+  }
+  for (const r of records) (r as unknown as { sessions: unknown }).sessions = byAttendance.get(Number(r.id)) || [];
+  return records;
 }
 
 // PORT NOTE: buildCalendar became async — it runs three queries and the data

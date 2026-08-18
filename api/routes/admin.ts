@@ -42,7 +42,7 @@ import { readPunchPhoto } from '../lib/photos.ts';
 // import here. Same value, same behaviour.
 import config from '../config.ts';
 import { publicUser } from './auth.ts';
-import { buildCalendar, shapeAttendance, shapeLeave } from './me.ts';
+import { attachSessions, buildCalendar, shapeAttendance, shapeLeave } from './me.ts';
 
 // Copied verbatim from routes/auth.ts.
 const body = async (c: { req: { json: () => Promise<unknown> } }): Promise<Record<string, unknown>> => {
@@ -596,10 +596,10 @@ async function attendanceQuery(q: Record<string, string | undefined>) {
 
 adminRoutes.get('/attendance', async (c) => {
   const { from, to, rows } = await attendanceQuery(c.req.query());
-  const records = rows.map((r) => ({
+  const records = await attachSessions(rows.map((r) => ({
     ...shapeAttendance(r),
     user_id: r.user_id, full_name: r.full_name, employee_code: r.employee_code,
-  }));
+  })));
   const totals = records.reduce((acc, r) => {
     acc.records += 1;
     acc.worked_minutes += (r.worked_minutes as number) || 0;
