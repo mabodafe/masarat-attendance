@@ -107,7 +107,7 @@ jobs:
 
       - name: Smoke test the deployed function
         run: |
-          URL="https://${{ secrets.SUPABASE_PROJECT_REF }}.supabase.co/functions/v1/api/api/health"
+          URL="https://${{ secrets.SUPABASE_PROJECT_REF }}.supabase.co/functions/v1/api/health"
           code=$(curl -s -o /tmp/health.json -w '%{http_code}' "$URL")
           echo "health: $code"; cat /tmp/health.json
           test "$code" = "200"
