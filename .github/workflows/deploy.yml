@@ -20,6 +20,19 @@ on:
     tags: ['v*']
   workflow_dispatch:
 
+# Rapid-fire pushes (several commits within a minute or two) used to start several
+# `deploy` runs at once, all racing to link/push/deploy the SAME Supabase project at
+# the same time. That produced a real failure mode: one run's smoke test could hit
+# the function mid-swap from another run and see a transient 404, even though nothing
+# was actually wrong. This groups all runs on the same ref onto one lane — a new push
+# cancels whatever's still in-flight for that ref, so only the latest commit's deploy
+# ever completes, and no two deploys can trample each other. `cancel-in-progress` is
+# safe here because a superseded run's deploy is, by definition, not the code we
+# want live anyway.
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     name: 122-check acceptance suite
