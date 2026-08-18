@@ -133,6 +133,22 @@ export async function resolvePunchTarget(userId: number, nowIso: string = T.nowI
 
   const open = candidates.filter((w) => now >= w.openAt && now <= w.endAt);
   if (open.length === 0) {
+    // Per-employee override, set by an admin (default false for every existing
+    // employee, so nobody's behaviour changes unless this is explicitly turned
+    // on for them). A flexible employee may punch in/out at any time instead of
+    // only inside the shift's window — but late/overtime minutes are still
+    // measured against their assigned shift below, so the warnings shown to the
+    // employee and the admin's colour-coded report keep working unchanged.
+    if (candidates.length > 0) {
+      const flex = await get<{ flexible_punch: number }>(
+        'SELECT flexible_punch FROM users WHERE id = ?', userId,
+      );
+      if (flex?.flexible_punch) {
+        const nearest = [...candidates].sort((a, b) =>
+          Math.abs(now.getTime() - a.startAt.getTime()) - Math.abs(now.getTime() - b.startAt.getTime()))[0];
+        return { ok: true, window: nearest };
+      }
+    }
     let upcoming = candidates
       .filter((w) => w.openAt > now)
       .sort((a, b) => a.openAt.getTime() - b.openAt.getTime())[0];
@@ -332,9 +348,16 @@ export async function handlePhoto(
   photo: unknown,
   { userId, kind }: { userId: number; kind: string },
 ): Promise<{ ok: boolean; name?: string | null; code?: string; error?: string }> {
-  if (config.selfieMode === 'off') return { ok: true, name: null };
+  // Per-employee override, set by an admin. NULL — the default for every
+  // existing employee — means "use the app-wide SELFIE_MODE setting", so
+  // nobody's behaviour changes unless this is explicitly set for them.
+  const pref = await get<{ photo_policy: string | null }>(
+    'SELECT photo_policy FROM users WHERE id = ?', userId,
+  );
+  const mode = pref?.photo_policy || config.selfieMode;
+  if (mode === 'off') return { ok: true, name: null };
   if (!photo) {
-    if (config.selfieMode === 'required') {
+    if (mode === 'required') {
       return { ok: false, code: 'photo_required', error: 'A photo is required. Allow camera access and take the photo.' };
     }
     return { ok: true, name: null };
