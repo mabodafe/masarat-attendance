@@ -1,0 +1,48 @@
+name: import-staff
+
+# Loads the real Masarat staff roster (scripts/import-masarat.ts) into the live
+# database: the four الصلاحيات admin accounts and the thirteen real employees,
+# plus a working roster. MANUAL TRIGGER ONLY — this creates real accounts with
+# real (randomly generated) passwords, so it must never run on every push.
+#
+# Safe to re-run: people are matched on employee code and updated in place;
+# existing roster days are never overwritten; passwords are generated once per
+# new account only.
+#
+# Required repository secret:
+#   SUPABASE_DB_URL   Supabase -> Project Settings -> Database -> Connection string (URI)
+#
+# The generated sign-in passwords are printed ONLY in this run's own log, visible
+# only to people with access to this private repository. Copy them out and hand
+# them to staff promptly.
+
+on:
+  workflow_dispatch:
+    inputs:
+      days:
+        description: 'Roster days ahead from today'
+        default: '30'
+      rest:
+        description: 'Rest weekday numbers, 0=Sun..6=Sat, comma-separated (5 = Friday only)'
+        default: '5'
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Import the real staff roster
+        run: |
+          deno run -A scripts/import-masarat.ts \
+            --days="${{ github.event.inputs.days }}" \
+            --rest="${{ github.event.inputs.rest }}"
+        env:
+          DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
+          # Not used to sign or verify any token here — bcrypt hashing needs no
+          # secret at all. This only exists to satisfy config.ts's fail-fast
+          # startup guard, so any value meeting the length/variety check works.
+          JWT_SECRET: throwaway-value-for-batch-jobs-only-not-used-to-sign-anything-Xk29Lm4Zq7
