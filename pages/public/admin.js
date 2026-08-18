@@ -32,11 +32,19 @@
   // ------------------------------------------------------------------- modal
   function modal(title, bodyHtml, onSubmit, submitLabel = 'Save') {
     const host = $('#modalHost');
+    // The body scrolls on its own (#modalScroll); the Save/Cancel row is
+    // sticky to the bottom of the modal panel. This keeps the buttons on
+    // screen even when: the form is taller than the viewport, or a mobile
+    // on-screen keyboard has shrunk the visible area while a field is
+    // focused — both cases where a plain scrolling backdrop previously let
+    // the action row scroll out of view.
     host.innerHTML = `<div class="modal-back"><form class="modal">
-      <h2>${esc(title)}</h2>
-      <div id="modalBody">${bodyHtml}</div>
-      <div id="modalErr" class="notice bad hidden" style="margin:.6rem 0"></div>
-      <div class="row" style="margin-top:.8rem">
+      <div id="modalScroll">
+        <h2>${esc(title)}</h2>
+        <div id="modalBody">${bodyHtml}</div>
+        <div id="modalErr" class="notice bad hidden" style="margin:.6rem 0"></div>
+      </div>
+      <div class="row modal-actions">
         <button type="submit" class="primary grow">${esc(submitLabel)}</button>
         <button type="button" class="ghost grow" id="modalCancel">Cancel</button>
       </div></form></div>`;

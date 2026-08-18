@@ -193,8 +193,25 @@ nav.side button.active { background: var(--accent); color: #fff; border-color: t
      reachable by scrolling, on any screen size. */
   display: flex; align-items: flex-start; justify-content: center; padding: 1rem; overflow: auto;
 }
-.modal { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
-  padding: 1.1rem; width: 100%; max-width: 520px; box-shadow: var(--shadow); }
+.modal {
+  background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 0; width: 100%; max-width: 520px; box-shadow: var(--shadow);
+  /* Belt-and-suspenders on top of top-aligning the backdrop: cap the panel's
+     own height and let ONLY its body scroll, with the Save/Cancel row
+     sticky at the bottom. On a phone, opening the on-screen keyboard shrinks
+     the visible area without necessarily letting the fixed backdrop's own
+     scroll follow along (a real, observed gap on some mobile browsers) — a
+     sticky action row inside the panel keeps Save reachable regardless. */
+  max-height: calc(100vh - 2rem);
+  max-height: calc(100dvh - 2rem); /* dvh tracks the keyboard-shrunk viewport; vh above is the fallback for browsers that don't support it */
+  display: flex; flex-direction: column; overflow: hidden;
+}
+#modalScroll { overflow-y: auto; padding: 1.1rem 1.1rem 0; flex: 1 1 auto; min-height: 0; }
+.modal .modal-actions {
+  flex: none; margin: 0; padding: .8rem 1.1rem calc(.8rem + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--line); background: var(--panel);
+  border-radius: 0 0 var(--radius) var(--radius);
+}
 
 .toast {
   position: fixed; inset-inline: 1rem; bottom: 5.6rem; z-index: 60; margin: 0 auto; max-width: 520px;
