@@ -13,9 +13,9 @@
   <main style="padding-top:3rem">
     <div class="card center">
       <img src="logo.svg" alt="" class="logo lg" style="margin:0 auto .6rem">
-      <h1>Admin console</h1>
-      <p class="muted">Sign in from the employee app first, using an admin account.</p>
-      <a href="index.html"><button class="primary">Go to sign in</button></a>
+      <h1 data-i18n="adminConsole">Admin console</h1>
+      <p class="muted" data-i18n="signInFirstHint">Sign in from the employee app first, using an admin account.</p>
+      <a href="index.html"><button class="primary" data-i18n="goToSignIn">Go to sign in</button></a>
     </div>
   </main>
 </section>
@@ -24,46 +24,47 @@
   <header class="bar">
     <span class="brand">
       <img src="logo.svg" alt="Masarat" class="logo">
-      <span><span class="wordmark">Masarat</span><span class="small muted" style="margin-inline-start:.5rem">HR Admin</span></span>
+      <span><span class="wordmark">Masarat</span><span class="small muted" data-i18n="hrAdmin" style="margin-inline-start:.5rem">HR Admin</span></span>
     </span>
     <div class="who">
       <div id="waName" style="font-weight:600"></div>
       <div class="small muted"><span id="waClock" class="mono"></span> · <span id="waTz"></span></div>
     </div>
-    <a href="index.html"><button class="ghost slim">My app</button></a>
-    <button class="ghost slim" id="waLogout">Sign out</button>
+    <a href="index.html"><button class="ghost slim" data-i18n="myApp">My app</button></a>
+    <button class="ghost slim" id="langBtn">العربية / English</button>
+    <button class="ghost slim" id="waLogout" data-i18n="signOut">Sign out</button>
   </header>
 
   <nav class="side" id="nav">
-    <button data-page="dash" class="active">Dashboard</button>
-    <button data-page="employees">Employees</button>
-    <button data-page="projects">Projects &amp; sites</button>
-    <button data-page="shifts">Shifts</button>
-    <button data-page="roster">Working calendar</button>
-    <button data-page="reports">Attendance &amp; reports</button>
-    <button data-page="timesheet">Timesheet</button>
-    <button data-page="leave">Leave <span id="leaveBadge" class="pill warn hidden"></span></button>
-    <button data-page="holidays">Holidays</button>
-    <button data-page="audit">Punch audit</button>
+    <button data-page="dash" class="active" data-i18n="navDashboard">Dashboard</button>
+    <button data-page="employees" data-i18n="navEmployees">Employees</button>
+    <button data-page="projects" data-i18n="navProjects">Projects &amp; sites</button>
+    <button data-page="shifts" data-i18n="navShifts">Shifts</button>
+    <button data-page="roster" data-i18n="navRoster">Working calendar</button>
+    <button data-page="reports" data-i18n="navReports">Attendance &amp; reports</button>
+    <button data-page="timesheet" data-i18n="navTimesheet">Timesheet</button>
+    <button data-page="leave"><span data-i18n="tabLeave">Leave</span> <span id="leaveBadge" class="pill warn hidden"></span></button>
+    <button data-page="holidays" data-i18n="navHolidays">Holidays</button>
+    <button data-page="audit" data-i18n="navAudit">Punch audit</button>
   </nav>
 
   <!-- ---------------- dashboard ---------------- -->
   <main id="pageDash">
     <div class="stats" id="dashStats"></div>
     <div class="card flush">
-      <div style="padding:1rem 1rem .4rem"><h2>On site right now</h2></div>
+      <div style="padding:1rem 1rem .4rem"><h2 data-i18n="onSiteNow">On site right now</h2></div>
       <div class="tablewrap"><table id="onSiteTable"></table></div>
     </div>
     <div class="card flush">
-      <div style="padding:1rem 1rem .4rem"><h2>Scheduled today but no punch yet</h2></div>
+      <div style="padding:1rem 1rem .4rem"><h2 data-i18n="scheduledNoPunch">Scheduled today but no punch yet</h2></div>
       <div class="tablewrap"><table id="absentTable"></table></div>
     </div>
     <div class="card flush hidden" id="pendingLeaveCard">
-      <div style="padding:1rem 1rem .4rem"><h2>Leave waiting for approval</h2></div>
+      <div style="padding:1rem 1rem .4rem"><h2 data-i18n="leaveWaiting">Leave waiting for approval</h2></div>
       <div class="tablewrap"><table id="pendingLeaveTable"></table></div>
     </div>
     <div class="card flush">
-      <div style="padding:1rem 1rem .4rem"><h2>Needs review (last 14 days)</h2></div>
+      <div style="padding:1rem 1rem .4rem"><h2 data-i18n="needsReview">Needs review (last 14 days)</h2></div>
       <div class="tablewrap"><table id="flaggedTable"></table></div>
     </div>
   </main>
@@ -73,7 +74,7 @@
     <div class="card">
       <div class="row">
         <input id="empSearch" class="grow" placeholder="Search name, employee ID or email">
-        <button class="primary slim" id="empNew">+ New employee account</button>
+        <button class="primary slim" id="empNew" data-i18n="newEmployeeAccount">+ New employee account</button>
       </div>
     </div>
     <div class="card flush"><div class="tablewrap"><table id="empTable"></table></div></div>
@@ -83,8 +84,8 @@
   <main id="pageProjects" class="hidden">
     <div class="card">
       <div class="row">
-        <b class="grow">Each site carries its own GPS centre and geofence radius.</b>
-        <button class="primary slim" id="projNew">+ New project / site</button>
+        <b class="grow" data-i18n="siteGeofenceHint">Each site carries its own GPS centre and geofence radius.</b>
+        <button class="primary slim" id="projNew" data-i18n="newProjectSite">+ New project / site</button>
       </div>
     </div>
     <div class="card flush"><div class="tablewrap"><table id="projTable"></table></div></div>
@@ -94,8 +95,8 @@
   <main id="pageShifts" class="hidden">
     <div class="card">
       <div class="row">
-        <b class="grow">Morning and night shifts, with grace periods.</b>
-        <button class="primary slim" id="shiftNew">+ New shift</button>
+        <b class="grow" data-i18n="shiftGraceHint">Morning and night shifts, with grace periods.</b>
+        <button class="primary slim" id="shiftNew" data-i18n="newShift">+ New shift</button>
       </div>
     </div>
     <div class="card flush"><div class="tablewrap"><table id="shiftTable"></table></div></div>
@@ -104,11 +105,11 @@
   <!-- ---------------- roster ---------------- -->
   <main id="pageRoster" class="hidden">
     <div class="card">
-      <h2>Generate roster</h2>
+      <h2 data-i18n="generateRoster">Generate roster</h2>
       <div class="row">
-        <div class="grow"><label>From</label><input type="date" id="genFrom"></div>
-        <div class="grow"><label>To</label><input type="date" id="genTo"></div>
-        <div class="grow"><label>Shift</label><select id="genShift"></select></div>
+        <div class="grow"><label data-i18n="from">From</label><input type="date" id="genFrom"></div>
+        <div class="grow"><label data-i18n="to">To</label><input type="date" id="genTo"></div>
+        <div class="grow"><label data-i18n="shiftLabel">Shift</label><select id="genShift"></select></div>
         <div class="grow"><label>Default site</label><select id="genProject"></select></div>
       </div>
       <div class="row" style="margin-top:.6rem">
@@ -124,21 +125,21 @@
       </div>
       <div class="row" style="margin-top:.6rem">
         <div class="grow">
-          <label>Employees</label>
+          <label data-i18n="employeeLabel">Employees</label>
           <select id="genUsers" multiple size="7"></select>
         </div>
       </div>
-      <button class="primary" id="genRun" style="margin-top:.6rem">Generate roster</button>
+      <button class="primary" id="genRun" style="margin-top:.6rem" data-i18n="generateRoster">Generate roster</button>
     </div>
 
     <div class="card">
-      <h2>Roster grid</h2>
+      <h2 data-i18n="rosterGrid">Roster grid</h2>
       <div class="row">
-        <div class="grow"><label>From</label><input type="date" id="rosFrom"></div>
-        <div class="grow"><label>To</label><input type="date" id="rosTo"></div>
-        <button class="primary slim" id="rosLoad">Show</button>
+        <div class="grow"><label data-i18n="from">From</label><input type="date" id="rosFrom"></div>
+        <div class="grow"><label data-i18n="to">To</label><input type="date" id="rosTo"></div>
+        <button class="primary slim" id="rosLoad" data-i18n="show">Show</button>
       </div>
-      <p class="small muted">Click any cell to set that employee's day: shift, site or rest/leave.</p>
+      <p class="small muted" data-i18n="clickCellHint">Click any cell to set that employee's day: shift, site or rest/leave.</p>
     </div>
     <div class="card flush"><div class="tablewrap"><table id="rosTable"></table></div></div>
   </main>
@@ -147,22 +148,22 @@
   <main id="pageReports" class="hidden">
     <div class="card">
       <div class="row">
-        <div class="grow"><label>From</label><input type="date" id="repFrom"></div>
-        <div class="grow"><label>To</label><input type="date" id="repTo"></div>
-        <div class="grow"><label>Employee</label><select id="repUser"></select></div>
+        <div class="grow"><label data-i18n="from">From</label><input type="date" id="repFrom"></div>
+        <div class="grow"><label data-i18n="to">To</label><input type="date" id="repTo"></div>
+        <div class="grow"><label data-i18n="employeeLabel">Employee</label><select id="repUser"></select></div>
         <div class="grow"><label>Project</label><select id="repProject"></select></div>
-        <div class="grow"><label>Filter</label>
+        <div class="grow"><label data-i18n="filterLabel">Filter</label>
           <select id="repFilter">
-            <option value="">All records</option>
-            <option value="flagged">Needs review only</option>
-            <option value="late">Late arrivals only</option>
-            <option value="open">Still checked in</option>
+            <option value="" data-i18n="allRecords">All records</option>
+            <option value="flagged" data-i18n="needsReviewOnly">Needs review only</option>
+            <option value="late" data-i18n="lateArrivalsOnly">Late arrivals only</option>
+            <option value="open" data-i18n="stillCheckedIn">Still checked in</option>
           </select>
         </div>
       </div>
       <div class="row" style="margin-top:.6rem">
-        <button class="primary slim" id="repLoad">Show</button>
-        <button class="ghost slim" id="repCsv">Export CSV</button>
+        <button class="primary slim" id="repLoad" data-i18n="show">Show</button>
+        <button class="ghost slim" id="repCsv" data-i18n="exportCsv">Export CSV</button>
       </div>
     </div>
     <div class="stats" id="repTotals"></div>
@@ -173,19 +174,19 @@
   <main id="pageTimesheet" class="hidden">
     <div class="card">
       <div class="row">
-        <div class="grow"><label>From</label><input type="date" id="tsFrom"></div>
-        <div class="grow"><label>To</label><input type="date" id="tsTo"></div>
-        <div class="grow"><label>Employee</label><select id="tsUser"></select></div>
+        <div class="grow"><label data-i18n="from">From</label><input type="date" id="tsFrom"></div>
+        <div class="grow"><label data-i18n="to">To</label><input type="date" id="tsTo"></div>
+        <div class="grow"><label data-i18n="employeeLabel">Employee</label><select id="tsUser"></select></div>
         <div class="grow">
-          <label>Include</label>
-          <label class="field inline small" style="margin:0"><input type="checkbox" id="tsInactive"> Deactivated staff</label>
+          <label data-i18n="includeLabel">Include</label>
+          <label class="field inline small" style="margin:0"><input type="checkbox" id="tsInactive"> <span data-i18n="deactivatedStaff">Deactivated staff</span></label>
         </div>
       </div>
       <div class="row" style="margin-top:.6rem">
-        <button class="primary slim" id="tsLoad">Show</button>
-        <button class="ghost slim" id="tsThisMonth">This month</button>
-        <button class="ghost slim" id="tsLastMonth">Last month</button>
-        <button class="ghost slim" id="tsCsv">Export CSV</button>
+        <button class="primary slim" id="tsLoad" data-i18n="show">Show</button>
+        <button class="ghost slim" id="tsThisMonth" data-i18n="thisMonth">This month</button>
+        <button class="ghost slim" id="tsLastMonth" data-i18n="lastMonth">Last month</button>
+        <button class="ghost slim" id="tsCsv" data-i18n="exportCsv">Export CSV</button>
       </div>
       <p class="small muted" style="margin-bottom:0">
         Paid hours already have the unpaid break deducted. A day is only counted as an
@@ -195,7 +196,7 @@
     <div class="stats" id="tsTotals"></div>
     <div class="card flush"><div class="tablewrap"><table id="tsTable"></table></div></div>
     <div class="card flush">
-      <div style="padding:1rem 1rem .4rem"><h2>Hours by project</h2></div>
+      <div style="padding:1rem 1rem .4rem"><h2 data-i18n="hoursByProject">Hours by project</h2></div>
       <div class="tablewrap"><table id="tsProjTable"></table></div>
     </div>
   </main>
@@ -203,30 +204,30 @@
   <!-- ---------------- leave ---------------- -->
   <main id="pageLeave" class="hidden">
     <div class="card">
-      <h2>Enter leave for an employee</h2>
-      <p class="small muted">Leave entered here is approved and written onto the calendar immediately.</p>
+      <h2 data-i18n="enterLeaveTitle">Enter leave for an employee</h2>
+      <p class="small muted" data-i18n="leaveEnteredHint">Leave entered here is approved and written onto the calendar immediately.</p>
       <div class="row">
-        <div class="grow"><label>Employee</label><select id="alUser"></select></div>
+        <div class="grow"><label data-i18n="employeeLabel">Employee</label><select id="alUser"></select></div>
         <div class="grow"><label>Type</label><select id="alType"></select></div>
-        <div class="grow"><label>From</label><input type="date" id="alFrom"></div>
-        <div class="grow"><label>To</label><input type="date" id="alTo"></div>
+        <div class="grow"><label data-i18n="from">From</label><input type="date" id="alFrom"></div>
+        <div class="grow"><label data-i18n="to">To</label><input type="date" id="alTo"></div>
       </div>
       <div class="row" style="margin-top:.6rem">
-        <div class="grow"><label>Reason</label><input id="alReason" placeholder="Optional"></div>
-        <button class="primary slim" id="alAdd" style="align-self:end">Add leave</button>
+        <div class="grow"><label data-i18n="reason">Reason</label><input id="alReason" placeholder="Optional"></div>
+        <button class="primary slim" id="alAdd" style="align-self:end" data-i18n="addLeave">Add leave</button>
       </div>
     </div>
     <div class="card">
       <div class="row">
-        <b class="grow">Requests</b>
+        <b class="grow" data-i18n="requestsLabel">Requests</b>
         <select id="lqFilter" style="max-width:220px">
           <option value="pending">Pending approval</option>
-          <option value="">All requests</option>
+          <option value="" data-i18n="allRecords">All requests</option>
           <option value="approved">Approved</option>
           <option value="rejected">Rejected</option>
           <option value="cancelled">Withdrawn</option>
         </select>
-        <button class="ghost slim" id="lqLoad">Show</button>
+        <button class="ghost slim" id="lqLoad" data-i18n="show">Show</button>
       </div>
     </div>
     <div class="card flush"><div class="tablewrap"><table id="lqTable"></table></div></div>
@@ -236,9 +237,9 @@
   <main id="pageHolidays" class="hidden">
     <div class="card">
       <div class="row">
-        <div class="grow"><label>Date</label><input type="date" id="holDate"></div>
+        <div class="grow"><label data-i18n="date">Date</label><input type="date" id="holDate"></div>
         <div class="grow"><label>Name</label><input id="holName" placeholder="Eid al-Fitr"></div>
-        <button class="primary slim" id="holAdd">Add holiday</button>
+        <button class="primary slim" id="holAdd" data-i18n="addHoliday">Add holiday</button>
       </div>
     </div>
     <div class="card flush"><div class="tablewrap"><table id="holTable"></table></div></div>
@@ -248,8 +249,8 @@
   <main id="pageAudit" class="hidden">
     <div class="card">
       <div class="row">
-        <div class="grow"><label>Employee</label><select id="audUser"></select></div>
-        <button class="primary slim" id="audLoad">Show</button>
+        <div class="grow"><label data-i18n="employeeLabel">Employee</label><select id="audUser"></select></div>
+        <button class="primary slim" id="audLoad" data-i18n="show">Show</button>
       </div>
       <p class="small muted">Every accepted and rejected punch attempt, with the reason and the GPS reading.</p>
     </div>

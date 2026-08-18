@@ -116,6 +116,8 @@
   }
 
   $('#waLogout').onclick = () => { store.clear(); location.href = 'index.html'; };
+  $('#langBtn').onclick = () => I18N.toggle();
+  window.addEventListener('langchange', () => { I18N.apply(); });
 
   $$('#nav button').forEach((b) => b.onclick = () => {
     $$('#nav button').forEach((x) => x.classList.toggle('active', x === b));
@@ -234,7 +236,9 @@
         <td><span class="pill ${u.role === 'admin' ? 'info' : ''}">${esc(u.role)}</span></td>
         <td class="mono">${u.project_count || 'all'}</td>
         <td>${u.active ? '<span class="pill ok">active</span>' : '<span class="pill bad">inactive</span>'}
-            ${u.must_change_password ? '<span class="pill warn">new password</span>' : ''}</td>
+            ${u.must_change_password ? '<span class="pill warn">new password</span>' : ''}
+            ${u.flexible_punch ? '<span class="pill info">flexible</span>' : ''}
+            ${u.photo_policy ? `<span class="pill">photo: ${esc(u.photo_policy)}</span>` : ''}</td>
         <td>${state.canEdit ? `<button class="ghost slim" data-edit-user="${u.id}">Edit</button>` : ''}</td>
       </tr>`));
     $$('[data-edit-user]').forEach((b) => b.onclick = () =>
@@ -275,6 +279,15 @@
         { label: 'Sites this employee may punch into (none selected = all sites)', name: 'project_ids',
           type: 'select', multiple: true, options: projectOptions },
       ]),
+      fieldRow([
+        { label: 'Photo before check-in/out', name: 'photo_policy', type: 'select',
+          options: opts(
+            [{ id: '', name: 'Use app default' }, { id: 'off', name: 'Off' },
+             { id: 'optional', name: 'Optional' }, { id: 'required', name: 'Required' }],
+            { selected: user?.photo_policy || '' }) },
+        { label: 'Flexible punching', name: 'flexible_punch', type: 'checkbox', value: user?.flexible_punch,
+          hint: "Lets this employee check in/out at any time, instead of only inside their shift's time window." },
+      ]),
       user ? fieldRow([{ label: 'Account active', name: 'active', type: 'checkbox', value: user.active }]) : '',
     ].join('');
 
@@ -284,6 +297,7 @@
         phone: data.phone || null, job_title: data.job_title || null, department: data.department || null,
         role: data.role, manager_id: Number(data.manager_id) || null,
         project_ids: data.project_ids.map(Number),
+        photo_policy: data.photo_policy || '', flexible_punch: !!data.flexible_punch,
       };
       if (data.password) payload.password = data.password;
       if (user) {
@@ -848,5 +862,6 @@
     } catch (ex) { toast(ex.message, 'bad'); }
   }
 
+  I18N.apply();
   boot();
 })();

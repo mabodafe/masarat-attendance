@@ -186,7 +186,12 @@ nav.side button.active { background: var(--accent); color: #fff; border-color: t
 
 .modal-back {
   position: fixed; inset: 0; background: rgba(0, 0, 0, .55); z-index: 50;
-  display: flex; align-items: center; justify-content: center; padding: 1rem; overflow: auto;
+  /* align-items was "center": with a modal taller than the viewport (the
+     working-calendar day editor is the tallest), the browser centred it so
+     content above the vertical midpoint — including the Save button — became
+     unreachable even with overflow: auto. Top-aligning keeps every modal
+     reachable by scrolling, on any screen size. */
+  display: flex; align-items: flex-start; justify-content: center; padding: 1rem; overflow: auto;
 }
 .modal { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
   padding: 1.1rem; width: 100%; max-width: 520px; box-shadow: var(--shadow); }

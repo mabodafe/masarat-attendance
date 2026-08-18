@@ -343,6 +343,7 @@
           + flagPills(out.flags)
         : `✅ <b>${t('checkedOutAt')} ${out.check_out_local}</b><br>${t('worked')}: ${durationText(out.worked_minutes)}`
           + (out.overtime_minutes ? `<br><span class="pill info">+${durationText(out.overtime_minutes)}</span>` : '')
+          + (out.flags?.includes('early_out') ? `<br><span class="pill warn">${esc(t('earlyOutWarning'))}</span>` : '')
           + flagPills(out.flags);
       result.classList.remove('hidden');
       toast(kind === 'check-in' ? t('checkedInAt') : t('checkedOutAt'), 'ok');
