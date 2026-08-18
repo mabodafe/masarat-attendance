@@ -48,6 +48,11 @@ CREATE TABLE IF NOT EXISTS users (
   password_hash TEXT    NOT NULL,
   must_change_password INTEGER NOT NULL DEFAULT 1,
   active        INTEGER NOT NULL DEFAULT 1,
+  -- Per-employee overrides, both additive and both defaulting to "no change
+  -- from today's behaviour": NULL follows the app-wide SELFIE_MODE setting,
+  -- and 0 keeps the employee restricted to their assigned shift's time window.
+  photo_policy   TEXT    CHECK (photo_policy IS NULL OR photo_policy IN ('off', 'optional', 'required')),
+  flexible_punch INTEGER NOT NULL DEFAULT 0,
   created_at    TEXT    NOT NULL,
   updated_at    TEXT    NOT NULL
 );
