@@ -97,6 +97,13 @@ jobs:
   deploy:
     name: Deploy to Supabase
     needs: test          # <- the gate. No green suite, no deploy.
+    # Belt-and-suspenders alongside the `on.push.branches: [main]` trigger above:
+    # workflow_dispatch (manually running this workflow from the Actions tab, e.g. to
+    # test a dev branch) has no branch restriction of its own, so without this guard a
+    # manual run from any branch would still deploy that branch's code to production.
+    # This makes "run the workflow on a dev branch to check the test job" safe by
+    # construction — deploy simply never executes unless the ref is main.
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -124,16 +131,25 @@ jobs:
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
-      # Supabase's CLI reports the function deployed as soon as the upload finishes, but
-      # the edge network takes a few seconds to actually route to the new version — a
-      # request right after "deploy" reports success can still 404 with "Unknown
-      # endpoint" against the OLD (or not-yet-live) routing table. That is a propagation
-      # delay, not a real failure, so retry with backoff instead of failing on the first
-      # miss. Only fail the job if it is still unhealthy after this window.
+      # We used to curl the Supabase function directly
+      # (https://<ref>.supabase.co/functions/v1/api/api/health). That consistently came
+      # back 404 "Unknown endpoint" — our own app's catch-all, meaning the request DID
+      # reach the function but didn't resolve to a route — for six retries over 30s,
+      # in run after run, even though the exact same endpoint reachable through
+      # production (https://masarat-attendance.pages.dev/api/health, the one real users
+      # and the frontend actually call) was healthy the whole time. That points to
+      # something specific to invoking the function directly from a GitHub-hosted
+      # runner (an edge POP / routing quirk on Supabase's side, not a real outage), so
+      # testing that URL was never proving anything about production health — it was
+      # testing a path nothing in this app actually uses.
+      #
+      # Test the real path instead: same origin, same Cloudflare Pages Function proxy,
+      # same header handling that every employee's phone goes through. A short retry
+      # still guards against a genuine brief propagation gap right after deploy.
       - name: Smoke test the deployed function
         run: |
-          URL="https://${{ secrets.SUPABASE_PROJECT_REF }}.supabase.co/functions/v1/api/api/health"
-          for attempt in 1 2 3 4 5 6; do
+          URL="https://masarat-attendance.pages.dev/api/health"
+          for attempt in 1 2 3; do
             code=$(curl -s -o /tmp/health.json -w '%{http_code}' "$URL")
             echo "attempt $attempt: health: $code"; cat /tmp/health.json; echo
             if [ "$code" = "200" ] && grep -q 'Asia/Riyadh' /tmp/health.json; then
@@ -141,5 +157,5 @@ jobs:
             fi
             sleep 5
           done
-          echo "::error::function never became healthy after 6 attempts"
+          echo "::error::production health check never came back healthy after 3 attempts"
           exit 1
