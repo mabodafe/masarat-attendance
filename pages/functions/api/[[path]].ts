@@ -29,8 +29,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   const { request, env } = context;
   const url = new URL(request.url);
 
-  const target = `${env.SUPABASE_FUNCTIONS_ORIGIN}/functions/v1/api${url.pathname}${url.search}`;
-
+  const target = `${env.SUPABASE_FUNCTIONS_ORIGIN}/functions/v1${url.pathname}${url.search}`;
   const headers = new Headers(request.headers);
   // Forward the true client IP so the login throttle is per-employee, not global.
   const clientIp = request.headers.get('cf-connecting-ip');
