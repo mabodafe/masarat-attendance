@@ -342,7 +342,14 @@ try {
 
   // Backdate the check-in so the check-out produces a realistic duration.
   // PORT NOTE: was a direct node:sqlite write; now the same UPDATE through api/db.ts.
+  // Multi-session support (check out, come back, keep the same shift running)
+  // moved the "how long was this session open" maths onto attendance_sessions
+  // — session 1's own check_in_at, not attendance.check_in_at directly — so
+  // that has to be backdated too, or checkOut() still sees "a few ms ago" and
+  // correctly refuses it as too_soon.
   await store.run('UPDATE attendance SET check_in_at = ? WHERE id = ?',
+    new Date(Date.now() - 3 * 3600 * 1000).toISOString(), ci.body.attendance_id);
+  await store.run('UPDATE attendance_sessions SET check_in_at = ? WHERE attendance_id = ? AND seq = 1',
     new Date(Date.now() - 3 * 3600 * 1000).toISOString(), ci.body.attendance_id);
 
   const co = await api('/api/me/check-out', { method: 'POST', token: et,
