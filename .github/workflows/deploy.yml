@@ -68,6 +68,12 @@ jobs:
           DATABASE_URL: postgres://masarat:ci-local-only@localhost:5432/masarat_ci
           JWT_SECRET: ci-only-secret-with-enough-variety-Xq7Zk29Lm4
 
+      - name: Multi-session check-in/out checks
+        run: deno run -A test/multi_session_test.ts
+        env:
+          DATABASE_URL: postgres://masarat:ci-local-only@localhost:5432/masarat_ci
+          JWT_SECRET: ci-only-secret-with-enough-variety-Xq7Zk29Lm4
+
       - name: Assert the suite did not write into a live photo directory
         run: |
           for d in data/photos .local-photos; do
@@ -107,7 +113,7 @@ jobs:
 
       - name: Smoke test the deployed function
         run: |
-          URL="https://${{ secrets.SUPABASE_PROJECT_REF }}.supabase.co/functions/v1/api/health"
+          URL="https://${{ secrets.SUPABASE_PROJECT_REF }}.supabase.co/functions/v1/api/api/health"
           code=$(curl -s -o /tmp/health.json -w '%{http_code}' "$URL")
           echo "health: $code"; cat /tmp/health.json
           test "$code" = "200"
