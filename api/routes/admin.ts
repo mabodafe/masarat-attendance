@@ -10,9 +10,11 @@
 //   req.query.foo                                 -> c.req.query('foo')
 //   req.params.id                                 -> c.req.param('id')
 // Every route path string, response body, status code, error message and field
-// name is byte-identical to the original. `adminOnly` is applied to exactly the
-// same nine routes as before (POST/PATCH users, POST/PATCH projects,
-// POST/PATCH shifts, POST/DELETE holidays, PATCH attendance); everything else
+// name is byte-identical to the original, for the routes that exist in the
+// original. `adminOnly` marks every destructive or account-affecting action
+// added since the port (POST/PATCH users, POST/PATCH projects, DELETE
+// projects, POST/PATCH shifts, POST/DELETE holidays, PATCH attendance,
+// POST photo-backups/run); everything else, including new read-only routes,
 // stays open to supervisors, exactly as the original router-level guard allowed.
 //
 // The only structural differences are platform-forced:
@@ -42,6 +44,11 @@ import { readPunchPhoto } from '../lib/photos.ts';
 // a CSV renamed. Pure in-memory, no filesystem dependency (confirmed under
 // Deno before wiring this in).
 import * as XLSX from 'npm:xlsx@0.18.5';
+// The 60-day selfie cleanup feature: backs a photo up into photo_backups
+// BEFORE deleting it, and lets the admin list/download those backups and
+// trigger a cleanup on demand from the console. See its own file for the
+// full design rationale.
+import * as PHOTO_CLEANUP from '../lib/photoCleanup.ts';
 // PORT NOTE: the original did `require('../config')` inline inside the GET
 // /dashboard handler. Deno has no synchronous require(), so it is a static
 // import here. Same value, same behaviour.
@@ -780,6 +787,38 @@ adminRoutes.get('/attendance/:id/photo/:kind', async (c) => {
   return new Response(bytes as unknown as BodyInit, {
     headers: { 'content-type': 'image/jpeg', 'cache-control': 'private, max-age=3600' },
   });
+});
+
+// --------------------------------------------------- selfie backup + cleanup
+// Owner's request: "auto free up space every 60 days (make sure first you
+// extracted all data copy to admin firstly)". The automatic side of this is
+// POST /api/cron/photo-cleanup in index.ts, on the same shared-secret guard
+// as the existing auto-close sweep. These three routes are the admin-facing
+// side: see exactly what has been backed up, download any of it, or run a
+// cleanup right now instead of waiting for the scheduler.
+//
+// Only selfie bytes are ever touched here — attendance rows, hours and every
+// report are completely unaffected, on purpose.
+adminRoutes.get('/photo-backups', async (c) => {
+  return c.json({ backups: await PHOTO_CLEANUP.listBackups(), retention_days: PHOTO_CLEANUP.RETENTION_DAYS });
+});
+
+adminRoutes.get('/photo-backups/:id/download', async (c) => {
+  const id = int(c.req.param('id'));
+  if (!id) return c.json({ error: 'Backup not found.' }, 404);
+  const archive = await PHOTO_CLEANUP.getBackupArchive(id);
+  if (!archive) return c.json({ error: 'Backup not found.' }, 404);
+  return new Response(archive as unknown as BodyInit, {
+    headers: {
+      'content-type': 'application/zip',
+      'content-disposition': `attachment; filename="selfie-backup-${id}.zip"`,
+    },
+  });
+});
+
+adminRoutes.post('/photo-backups/run', adminOnly, async (c) => {
+  const result = await PHOTO_CLEANUP.runCleanup();
+  return c.json(result);
 });
 
 // ------------------------------------------------------ timesheet / payroll
