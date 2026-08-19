@@ -573,6 +573,24 @@ try {
   ok('timesheet CSV exports',
     tsCsv.status === 200 && tsText.includes('Paid hours') && tsText.includes('TOTAL'), tsText.slice(0, 100));
 
+  // A genuine binary .xlsx (SheetJS-built), for admins who want to open the
+  // monthly attendance sheet straight in Excel instead of a CSV. An .xlsx
+  // file is itself a zip archive, so "starts with the zip magic bytes PK"
+  // is the cheapest real proof this is an actual workbook and not just the
+  // CSV renamed with a different extension.
+  const tsXlsx = await fetch(`${BASE}/api/admin/timesheet.xlsx?from=${today}&to=${today}`,
+    { headers: { authorization: `Bearer ${admin}` } });
+  const tsXlsxBytes = new Uint8Array(await tsXlsx.arrayBuffer());
+  ok('timesheet Excel export responds with the xlsx content type',
+    tsXlsx.status === 200 &&
+    tsXlsx.headers.get('content-type') === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    tsXlsx.headers.get('content-type'));
+  ok('timesheet Excel export is a real workbook (zip magic bytes PK)',
+    tsXlsxBytes.length > 100 && tsXlsxBytes[0] === 0x50 && tsXlsxBytes[1] === 0x4b, tsXlsxBytes.slice(0, 4));
+  ok('timesheet Excel export sets a filename with the date range',
+    (tsXlsx.headers.get('content-disposition') || '').includes(`timesheet_${today}_to_${today}.xlsx`),
+    tsXlsx.headers.get('content-disposition'));
+
   // -------------------------------------------------------- shift maths
   section('Shift maths (night shift across midnight)');
   // PORT NOTE: createRequire(...) of the three server modules becomes plain

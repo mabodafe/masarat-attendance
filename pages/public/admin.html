@@ -181,16 +181,24 @@
           <label data-i18n="includeLabel">Include</label>
           <label class="field inline small" style="margin:0"><input type="checkbox" id="tsInactive"> <span data-i18n="deactivatedStaff">Deactivated staff</span></label>
         </div>
+        <div class="grow" style="max-width:9rem">
+          <label data-i18n="cutoffDay">Cutoff day</label>
+          <input type="number" id="tsCutoff" min="1" max="28" value="25">
+        </div>
       </div>
       <div class="row" style="margin-top:.6rem">
         <button class="primary slim" id="tsLoad" data-i18n="show">Show</button>
         <button class="ghost slim" id="tsThisMonth" data-i18n="thisMonth">This month</button>
         <button class="ghost slim" id="tsLastMonth" data-i18n="lastMonth">Last month</button>
+        <button class="ghost slim" id="tsThisCutoff" data-i18n="thisCutoffPeriod">This cutoff period</button>
+        <button class="ghost slim" id="tsLastCutoff" data-i18n="lastCutoffPeriod">Previous cutoff period</button>
         <button class="ghost slim" id="tsCsv" data-i18n="exportCsv">Export CSV</button>
+        <button class="ghost slim" id="tsXlsx" data-i18n="exportExcel">Export Excel</button>
       </div>
       <p class="small muted" style="margin-bottom:0">
         Paid hours already have the unpaid break deducted. A day is only counted as an
         absence once it is over — today never counts against anyone.
+        <span data-i18n="cutoffHint">The cutoff day is the day of the month your pay period ends on (e.g. 25 means each period runs the 26th to the 25th) — it's remembered on this device.</span>
       </p>
     </div>
     <div class="stats" id="tsTotals"></div>

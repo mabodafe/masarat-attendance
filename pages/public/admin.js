@@ -704,8 +704,12 @@
   $('#tsLoad').onclick = loadTimesheet;
   $('#tsCsv').onclick = () => downloadFile(`/admin/timesheet.csv?${timesheetQuery()}`,
     `timesheet_${$('#tsFrom').value}_to_${$('#tsTo').value}.csv`);
+  $('#tsXlsx').onclick = () => downloadFile(`/admin/timesheet.xlsx?${timesheetQuery()}`,
+    `timesheet_${$('#tsFrom').value}_to_${$('#tsTo').value}.xlsx`);
   $('#tsThisMonth').onclick = () => { setTsMonth(0); loadTimesheet(); };
   $('#tsLastMonth').onclick = () => { setTsMonth(-1); loadTimesheet(); };
+  $('#tsThisCutoff').onclick = () => { setCutoffPeriod(0); loadTimesheet(); };
+  $('#tsLastCutoff').onclick = () => { setCutoffPeriod(1); loadTimesheet(); };
 
   function setTsMonth(delta) {
     const n = localNow();
@@ -713,6 +717,37 @@
     const last = new Date(Date.UTC(n.getUTCFullYear(), n.getUTCMonth() + delta + 1, 0));
     $('#tsFrom').value = first.toISOString().slice(0, 10);
     $('#tsTo').value = last.toISOString().slice(0, 10);
+  }
+
+  // The "cutoff day" is the day-of-month an admin's pay period ends on (e.g.
+  // 25 -> each period runs the 26th of one month through the 25th of the
+  // next). It's a per-device UI preference, not attendance data, so it lives
+  // in localStorage exactly the way the existing auth token/session already
+  // do in api.js — nothing payroll-relevant is stored this way.
+  const CUTOFF_KEY = 'ts_cutoff_day';
+  $('#tsCutoff').value = Number(localStorage.getItem(CUTOFF_KEY)) || 25;
+  $('#tsCutoff').onchange = () => {
+    const d = Math.min(28, Math.max(1, Number($('#tsCutoff').value) || 25));
+    $('#tsCutoff').value = d;
+    localStorage.setItem(CUTOFF_KEY, String(d));
+  };
+
+  // periodsBack = 0 -> the period containing today; 1 -> the one before that.
+  // A period runs from (cutoff day + 1) of one month through the cutoff day
+  // of the next — capped at 28 above so it lands on a real date in every
+  // month, including February.
+  function setCutoffPeriod(periodsBack) {
+    const cutoff = Number(localStorage.getItem(CUTOFF_KEY)) || 25;
+    const n = localNow();
+    // If today is on/before the cutoff day, "this period" ends this month;
+    // otherwise it ends next month. Date.UTC normalizes an out-of-range
+    // month index itself, so subtracting periodsBack here just works across
+    // year boundaries too.
+    const endMonth = n.getUTCMonth() + (n.getUTCDate() <= cutoff ? 0 : 1) - periodsBack;
+    const end = new Date(Date.UTC(n.getUTCFullYear(), endMonth, cutoff));
+    const start = new Date(Date.UTC(n.getUTCFullYear(), endMonth - 1, cutoff + 1));
+    $('#tsFrom').value = start.toISOString().slice(0, 10);
+    $('#tsTo').value = end.toISOString().slice(0, 10);
   }
 
   function timesheetQuery() {
