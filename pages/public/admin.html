@@ -46,6 +46,7 @@
     <button data-page="leave"><span data-i18n="tabLeave">Leave</span> <span id="leaveBadge" class="pill warn hidden"></span></button>
     <button data-page="holidays" data-i18n="navHolidays">Holidays</button>
     <button data-page="audit" data-i18n="navAudit">Punch audit</button>
+    <button data-page="photos" data-i18n="navPhotoBackups">Photo backups</button>
   </nav>
 
   <!-- ---------------- dashboard ---------------- -->
@@ -263,6 +264,21 @@
       <p class="small muted">Every accepted and rejected punch attempt, with the reason and the GPS reading.</p>
     </div>
     <div class="card flush"><div class="tablewrap"><table id="audTable"></table></div></div>
+  </main>
+
+  <!-- ---------------- photo backups ---------------- -->
+  <main id="pagePhotos" class="hidden">
+    <div class="card">
+      <p class="small muted" style="margin-top:0">
+        Selfies older than <span id="phRetentionDays">60</span> days are removed automatically to free up
+        space. Every selfie is zipped into a downloadable backup here <b>before</b> it is deleted —
+        attendance records, worked hours and every report are never affected.
+      </p>
+      <div class="row">
+        <button class="primary slim" id="phRun" data-i18n="runCleanupNow">Run cleanup now</button>
+      </div>
+    </div>
+    <div class="card flush"><div class="tablewrap"><table id="phTable"></table></div></div>
   </main>
 </section>
 

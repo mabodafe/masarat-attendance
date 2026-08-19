@@ -11,7 +11,8 @@ name: deploy
 #   SUPABASE_PROJECT_REF    the project ref, e.g. abcdefghijkl
 #   SUPABASE_DB_PASSWORD    the database password you chose when creating the project
 #
-# The gate: this workflow runs the 122-check suite against a throwaway Postgres and
+# The gate: this workflow runs the 131-check suite (plus the dedicated
+# multi-session and photo-cleanup suites) against a throwaway Postgres and
 # REFUSES TO DEPLOY if a single check fails.
 
 on:
@@ -35,7 +36,7 @@ concurrency:
 
 jobs:
   test:
-    name: 122-check acceptance suite
+    name: 131-check acceptance suite
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -75,7 +76,7 @@ jobs:
           JWT_SECRET: ci-only-secret-with-enough-variety-Xq7Zk29Lm4
           ALLOW_OUT_OF_FENCE_WITH_FLAG: 'true'
 
-      - name: THE GATE — 122 end-to-end checks
+      - name: THE GATE — 131 end-to-end checks
         run: deno run -A test/run.ts
         env:
           DATABASE_URL: postgres://masarat:ci-local-only@localhost:5432/masarat_ci
@@ -83,6 +84,12 @@ jobs:
 
       - name: Multi-session check-in/out checks
         run: deno run -A test/multi_session_test.ts
+        env:
+          DATABASE_URL: postgres://masarat:ci-local-only@localhost:5432/masarat_ci
+          JWT_SECRET: ci-only-secret-with-enough-variety-Xq7Zk29Lm4
+
+      - name: 60-day selfie cleanup and backup checks
+        run: deno run -A test/photo_cleanup_test.ts
         env:
           DATABASE_URL: postgres://masarat:ci-local-only@localhost:5432/masarat_ci
           JWT_SECRET: ci-only-secret-with-enough-variety-Xq7Zk29Lm4

@@ -1,0 +1,48 @@
+name: photo-cleanup
+
+# Owner's request: "auto free up space every 60 days (make sure first you
+# extracted all data copy to admin firstly)". This pokes the production API's
+# POST /api/cron/photo-cleanup once a day; the endpoint itself is the actual
+# safety net — it only backs up and deletes anything once 60 days have really
+# passed since the last backup (api/lib/photoCleanup.ts: runCleanupIfDue()),
+# so a daily poke is always harmless to send even though the real work only
+# happens roughly every 60th run.
+#
+# Required repository secret:
+#   CRON_SECRET   must be the EXACT SAME value as the CRON_SECRET already set
+#                 in the Supabase Edge Function's own environment (Project
+#                 Settings -> Edge Functions -> api -> Secrets). That secret
+#                 already gates the existing /api/cron/auto-close sweep this
+#                 workflow's request has to match; there is nothing new to
+#                 configure on the Supabase side, only here.
+#
+# The backup itself never leaves the app: it's a row in the photo_backups
+# table, downloadable from the admin console at any time (Photo backups page).
+# Nothing here uploads anywhere else, on purpose — the owner asked for a
+# console download, not Supabase Storage and not email.
+
+on:
+  schedule:
+    - cron: '30 21 * * *'   # 21:30 UTC = 00:30 Asia/Riyadh, well clear of the day's shifts
+  workflow_dispatch:
+
+jobs:
+  poke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Poke the photo-cleanup endpoint
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::warning::CRON_SECRET repository secret is not set — skipping. Set it to the same value configured in the Supabase Edge Function to enable automatic photo cleanup."
+            exit 0
+          fi
+          code=$(curl -s -o /tmp/resp.json -w '%{http_code}' \
+            -X POST "https://masarat-attendance.pages.dev/api/cron/photo-cleanup" \
+            -H "x-cron-secret: $CRON_SECRET")
+          echo "status: $code"; cat /tmp/resp.json; echo
+          if [ "$code" != "200" ]; then
+            echo "::error::photo-cleanup endpoint returned $code"
+            exit 1
+          fi
