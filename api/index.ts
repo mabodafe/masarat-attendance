@@ -85,6 +85,27 @@ app.post('/api/cron/auto-close', async (c) => {
   }
 });
 
+// Owner's request: "auto free up space every 60 days (make sure first you
+// extracted all data copy to admin firstly)". Same shared-secret guard as
+// auto-close above, so the one already-provisioned scheduler can poke this
+// too. runCleanupIfDue() is itself the safety net if this fires more often
+// than every 60 days — it only actually purges once that long has really
+// passed, so an hourly or daily poke is always harmless to send.
+app.post('/api/cron/photo-cleanup', async (c) => {
+  if (!config.cronSecret || c.req.header('x-cron-secret') !== config.cronSecret) {
+    return c.json({ error: 'Not authorised.' }, 401);
+  }
+  const { runCleanupIfDue } = await import('./lib/photoCleanup.ts');
+  try {
+    const result = await runCleanupIfDue();
+    if (result.ran) console.log(`[photo-cleanup] backed up and purged ${result.purged_photos} selfie(s)`);
+    return c.json({ ok: true, ...result });
+  } catch (err) {
+    console.error('[photo-cleanup] failed', err);
+    return c.json({ error: 'Photo cleanup failed.' }, 500);
+  }
+});
+
 // ---- 404 for unknown API routes (same shape as before) ---------------------
 app.all('/api/*', (c) => c.json({ error: 'Unknown endpoint.' }, 404));
 
