@@ -360,6 +360,31 @@ try {
     (await api('/api/me/check-out', { method: 'POST', token: et,
       body: { project_id: P.id, ...at, accuracy: 12, captured_at: nowIso() } })).body.code === 'not_checked_in');
 
+  // --------------------------------------------------------- site deletion
+  section('Deleting a project / site');
+  // P now has a real attendance row (the check-in/check-out above), so this
+  // must be refused — deleting it would erase a payroll record. This is the
+  // owner's explicit requirement that removing a site must never touch real
+  // attendance history.
+  const delWithHistory = await api(`/api/admin/projects/${P.id}`, { method: 'DELETE', token: admin });
+  ok('a site with attendance history cannot be deleted', delWithHistory.status === 400 && delWithHistory.body.code === 'has_history', delWithHistory.body);
+  ok('the site is still there afterwards',
+    (await api('/api/admin/projects', { token: admin })).body.projects.some((p: Json) => p.id === P.id));
+
+  // A site that was created and never actually used has nothing referencing
+  // it, so it can be removed outright.
+  const throwaway = await api('/api/admin/projects', {
+    method: 'POST', token: admin,
+    body: { code: 'DELETE-ME', name: 'Never used', lat: 24.5, lng: 46.5, radius_m: 100 },
+  });
+  ok('throwaway project created', throwaway.status === 201, throwaway.body);
+  const delEmpty = await api(`/api/admin/projects/${throwaway.body.project.id}`, { method: 'DELETE', token: admin });
+  ok('a site with zero history can be deleted', delEmpty.status === 200 && delEmpty.body.ok, delEmpty.body);
+  ok('the deleted site no longer appears in the list',
+    !(await api('/api/admin/projects', { token: admin })).body.projects.some((p: Json) => p.id === throwaway.body.project.id));
+  ok('deleting an already-deleted (unknown) site 404s',
+    (await api(`/api/admin/projects/${throwaway.body.project.id}`, { method: 'DELETE', token: admin })).status === 404);
+
   // -------------------------------------------------------------- reporting
   section('Reports and audit');
   ok('employee sees their own hours',
