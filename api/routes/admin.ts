@@ -291,6 +291,43 @@ adminRoutes.patch('/projects/:id', adminOnly, async (c) => {
   return c.json({ project: await get('SELECT * FROM projects WHERE id = ?', id) });
 });
 
+// Permanently remove a site. This is deliberately NOT the same thing as
+// `PATCH /projects/:id { active: false }` above, which just hides a site from
+// check-in while keeping every report it ever appears in intact.
+//
+// A site that has ever had a check-in, a check-out, or a schedule entry is
+// wired into `attendance` / `attendance_sessions` / `schedules` by a foreign
+// key with no ON DELETE clause (see schema.postgres.sql), so Postgres itself
+// would refuse the delete — that is the correct outcome: this system produces
+// the hours wages are paid from, and a site that has real history must not be
+// erasable. We check for that history ourselves first so the admin gets a
+// clear reason instead of a raw database error, and point them at
+// deactivating instead. Only a site with zero history (created by mistake, a
+// duplicate, a site that was set up but never actually used) can be deleted.
+adminRoutes.delete('/projects/:id', adminOnly, async (c) => {
+  const id = int(c.req.param('id'));
+  if (!await get('SELECT id FROM projects WHERE id = ?', id)) return c.json({ error: 'Project not found.' }, 404);
+
+  const [attRow, sessionRow, scheduleRow] = await Promise.all([
+    get('SELECT id FROM attendance WHERE project_id = ? OR check_out_project_id = ? LIMIT 1', id, id),
+    get('SELECT id FROM attendance_sessions WHERE check_out_project_id = ? LIMIT 1', id),
+    get('SELECT id FROM schedules WHERE project_id = ? LIMIT 1', id),
+  ]);
+  if (attRow || sessionRow || scheduleRow) {
+    return c.json({
+      error: 'This site has attendance or schedule history, so it can’t be permanently deleted — '
+        + 'that would erase real payroll records. Deactivate it instead: deactivated sites disappear from '
+        + 'check-in but every past report stays exactly as it was.',
+      code: 'has_history',
+    }, 400);
+  }
+
+  // No history exists for this site, so nothing else references it except
+  // project_members (ON DELETE CASCADE handles that automatically).
+  await run('DELETE FROM projects WHERE id = ?', id);
+  return c.json({ ok: true });
+});
+
 interface ProjectDraft {
   error?: string;
   code?: string;
