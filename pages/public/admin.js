@@ -131,12 +131,12 @@
     $$('#nav button').forEach((x) => x.classList.toggle('active', x === b));
     const pages = { dash: 'Dash', employees: 'Employees', projects: 'Projects', shifts: 'Shifts',
                     roster: 'Roster', reports: 'Reports', timesheet: 'Timesheet', leave: 'Leave',
-                    holidays: 'Holidays', audit: 'Audit' };
+                    holidays: 'Holidays', audit: 'Audit', photos: 'Photos' };
     Object.entries(pages).forEach(([key, id]) =>
       $(`#page${id}`).classList.toggle('hidden', key !== b.dataset.page));
     ({ dash: loadDash, employees: renderUsers, projects: renderProjects, shifts: renderShifts,
        roster: loadRoster, reports: loadReport, timesheet: loadTimesheet, leave: loadLeaveQueue,
-       holidays: loadHolidays, audit: loadAudit }[b.dataset.page])();
+       holidays: loadHolidays, audit: loadAudit, photos: loadPhotoBackups }[b.dataset.page])();
   });
 
   // --------------------------------------------------------------- reference
@@ -943,6 +943,43 @@
           <td class="mono small">${l.lat == null ? '—' :
             `<a href="https://www.google.com/maps?q=${l.lat},${l.lng}" target="_blank" rel="noopener">${l.lat.toFixed(5)}, ${l.lng.toFixed(5)}</a>`}</td>
         </tr>`));
+    } catch (ex) { toast(ex.message, 'bad'); }
+  }
+
+  // ------------------------------------------------------------ photo backups
+  // Owner's request: selfies older than 60 days are freed up automatically,
+  // but only after a downloadable copy of exactly what's about to be removed
+  // lands here first. Attendance rows, hours and reports are never touched.
+  const fileSize = (n) => n < 1024 ? `${n} B` : n < 1024 * 1024 ? `${(n / 1024).toFixed(1)} KB` : `${(n / (1024 * 1024)).toFixed(1)} MB`;
+
+  $('#phRun').onclick = async () => {
+    if (!confirm('Back up and remove every selfie older than the retention window right now?')) return;
+    try {
+      const r = await api('/admin/photo-backups/run', { method: 'POST' });
+      toast(r.purged_photos
+        ? `Backed up and removed ${r.purged_photos} selfie(s).`
+        : 'Nothing was old enough to remove yet — an empty backup was still recorded.', 'ok');
+      loadPhotoBackups();
+    } catch (ex) { toast(ex.message, 'bad'); }
+  };
+
+  async function loadPhotoBackups() {
+    try {
+      const out = await api('/admin/photo-backups');
+      $('#phRetentionDays').textContent = out.retention_days;
+      $('#phTable').innerHTML = table(
+        ['Created', 'Selfies older than cutoff', 'Photos backed up', 'Archive size', ''],
+        out.backups.map((b) => `<tr>
+          <td class="mono small">${esc(b.created_at)}</td>
+          <td class="mono small">${esc(b.cutoff_at)}</td>
+          <td class="mono">${b.photo_count}</td>
+          <td class="mono">${fileSize(b.size_bytes)}</td>
+          <td><a class="ghost slim" href="#" data-dl-backup="${b.id}">Download</a></td>
+        </tr>`));
+      $$('[data-dl-backup]').forEach((a) => a.onclick = (e) => {
+        e.preventDefault();
+        downloadFile(`/admin/photo-backups/${a.dataset.dlBackup}/download`, `selfie-backup-${a.dataset.dlBackup}.zip`);
+      });
     } catch (ex) { toast(ex.message, 'bad'); }
   }
 
