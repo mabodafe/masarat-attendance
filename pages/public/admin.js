@@ -341,9 +341,23 @@
           <a href="https://www.google.com/maps?q=${p.lat},${p.lng}" target="_blank" rel="noopener">
             <button class="ghost slim">Map</button></a>
           ${state.canEdit ? `<button class="ghost slim" data-edit-proj="${p.id}">Edit</button>` : ''}
+          ${state.canEdit ? `<button class="ghost slim" data-del-proj="${p.id}">Delete</button>` : ''}
         </td></tr>`));
     $$('[data-edit-proj]').forEach((b) => b.onclick = () =>
       projectModal(state.projects.find((p) => p.id === Number(b.dataset.editProj))));
+    // A site with real attendance/schedule history is rejected by the server
+    // (it would erase payroll records) — that rejection's message explains
+    // deactivating instead, and is shown to the admin verbatim.
+    $$('[data-del-proj]').forEach((b) => b.onclick = async () => {
+      const proj = state.projects.find((p) => p.id === Number(b.dataset.delProj));
+      if (!proj) return;
+      if (!confirm(`Permanently delete "${proj.name}"? This cannot be undone.`)) return;
+      try {
+        await api(`/admin/projects/${proj.id}`, { method: 'DELETE' });
+        toast('Site deleted.', 'ok');
+        await loadProjects(); fillPickers(); renderProjects();
+      } catch (ex) { toast(ex.message, 'bad'); }
+    });
   }
 
   function projectModal(p) {
