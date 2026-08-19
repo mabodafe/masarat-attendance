@@ -37,6 +37,11 @@ import * as REPORTS from '../lib/reports.ts';
 // res.sendFile(). readPunchPhoto() applies the identical filename allowlist the
 // old photoPath() applied before touching disk, then returns the bytes.
 import { readPunchPhoto } from '../lib/photos.ts';
+// Builds the genuine binary .xlsx workbook for the "Export Excel" timesheet
+// button — a real spreadsheet an admin can open directly in Excel, not just
+// a CSV renamed. Pure in-memory, no filesystem dependency (confirmed under
+// Deno before wiring this in).
+import * as XLSX from 'npm:xlsx@0.18.5';
 // PORT NOTE: the original did `require('../config')` inline inside the GET
 // /dashboard handler. Deno has no synchronous require(), so it is a static
 // import here. Same value, same behaviour.
@@ -832,6 +837,66 @@ adminRoutes.get('/timesheet.csv', async (c) => {
   return c.body('﻿' + lines.join('\r\n'), 200, {
     'Content-Type': 'text/csv; charset=utf-8',
     'Content-Disposition': `attachment; filename="timesheet_${from}_to_${to}.csv"`,
+  });
+});
+
+// A genuine binary .xlsx workbook of the same numbers as the CSV export above,
+// for admins who want to open the monthly attendance sheet directly in Excel
+// (formatted columns, two tabs) rather than a flat CSV. `from`/`to` here are
+// normally a payroll cutoff period picked in the UI (e.g. "26th to 25th"),
+// but this endpoint itself just takes a date range — the cutoff-day math
+// lives entirely on the client, same as "This month" / "Last month" already
+// do for the existing CSV export.
+adminRoutes.get('/timesheet.xlsx', async (c) => {
+  const { from, to } = rangeFrom(c.req.query());
+  const sheet = await REPORTS.timesheet({
+    from, to,
+    userId: int(c.req.query('user_id')) || null,
+    includeInactive: c.req.query('include_inactive') === 'true',
+  }) as { rows: Record<string, string | number | null>[]; totals: Record<string, number> };
+  const byProject = await REPORTS.byProject({ from, to }) as Record<string, string | number | null>[];
+
+  const empHeader = [
+    'Employee ID', 'Employee', 'Job title', 'Department',
+    'Scheduled days', 'Worked days', 'Absent days', 'Leave days', 'Rest days', 'Holidays',
+    'Attendance %', 'Paid hours', 'Paid minutes', 'Late count', 'Late minutes',
+    'Early out minutes', 'Overtime minutes', 'Missing check-outs', 'Unscheduled days', 'Days needing review',
+  ];
+  const empRows = sheet.rows.map((r) => [
+    r.employee_code, r.full_name, r.job_title || '', r.department || '',
+    r.scheduled_days, r.worked_days, r.absent_days, r.leave_days, r.off_days, r.holiday_days,
+    r.attendance_rate ?? '', r.paid_hours, r.paid_minutes, r.late_count, r.late_minutes,
+    r.early_out_minutes, r.overtime_minutes, r.missing_checkout, r.unscheduled_days, r.flagged_days,
+  ]);
+  const empTotals = [
+    'TOTAL', `${sheet.totals.employees} employees`, '', '',
+    sheet.totals.scheduled_days, sheet.totals.worked_days, sheet.totals.absent_days,
+    sheet.totals.leave_days, '', '', '', sheet.totals.paid_hours, sheet.totals.paid_minutes,
+    sheet.totals.late_count, sheet.totals.late_minutes, '', sheet.totals.overtime_minutes,
+    sheet.totals.missing_checkout, '', sheet.totals.flagged_days,
+  ];
+
+  const projHeader = ['Code', 'Project', 'Client', 'Employees', 'Records', 'Paid hours', 'Overtime minutes'];
+  const projRows = byProject.map((p) => [p.code, p.name, p.client || '', p.employees, p.records, p.paid_hours, p.overtime_minutes]);
+
+  const wsEmp = XLSX.utils.aoa_to_sheet([[`Timesheet ${from} to ${to}`], [], empHeader, ...empRows, [], empTotals]);
+  wsEmp['!cols'] = empHeader.map(() => ({ wch: 14 }));
+  const wsProj = XLSX.utils.aoa_to_sheet([[`Hours by project ${from} to ${to}`], [], projHeader, ...projRows]);
+  wsProj['!cols'] = projHeader.map(() => ({ wch: 16 }));
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, wsEmp, 'Timesheet');
+  XLSX.utils.book_append_sheet(wb, wsProj, 'By project');
+  const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }) as Uint8Array;
+
+  // PORT NOTE: same pattern as the punch-photo route above — Hono's c.body()
+  // Data type doesn't include Uint8Array/Blob, so this goes through a plain
+  // Response exactly like readPunchPhoto()'s bytes do.
+  return new Response(buf as unknown as BodyInit, {
+    headers: {
+      'content-type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'content-disposition': `attachment; filename="timesheet_${from}_to_${to}.xlsx"`,
+    },
   });
 });
 
