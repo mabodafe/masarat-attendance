@@ -291,9 +291,16 @@ try {
     (await api('/api/admin/schedules', { method: 'POST', token: admin,
       body: { user_id: empId, work_date: today, status: 'work' } })).status === 400);
 
+  const plus60 = (ymd: string) => {
+    const d = new Date(`${ymd}T00:00:00Z`); d.setUTCDate(d.getUTCDate() + 60);
+    return d.toISOString().slice(0, 10);
+  };
   const gen = await api('/api/admin/schedules/generate', {
     method: 'POST', token: admin,
-    body: { user_ids: [empId], from: today, to: '2026-12-31', shift_id: morning.id,
+    // The leave checks below use fixed dates (Oct–Nov 2026), so the roster must
+    // cover them whatever day the suite runs on — and still reach 30+ days ahead.
+    body: { user_ids: [empId], from: today < '2026-10-01' ? today : '2026-10-01',
+            to: plus60(today) > '2026-12-31' ? plus60(today) : '2026-12-31', shift_id: morning.id,
             project_id: P.id, rest_weekdays: [5, 6], overwrite: true },
   });
   ok('bulk roster generation', gen.status === 200 && gen.body.written > 30, gen.body);

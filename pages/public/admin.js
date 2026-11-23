@@ -131,12 +131,12 @@
     $$('#nav button').forEach((x) => x.classList.toggle('active', x === b));
     const pages = { dash: 'Dash', employees: 'Employees', projects: 'Projects', shifts: 'Shifts',
                     roster: 'Roster', reports: 'Reports', timesheet: 'Timesheet', leave: 'Leave',
-                    holidays: 'Holidays', audit: 'Audit', photos: 'Photos' };
+                    holidays: 'Holidays', audit: 'Audit', photos: 'Photos', passwords: 'Passwords' };
     Object.entries(pages).forEach(([key, id]) =>
       $(`#page${id}`).classList.toggle('hidden', key !== b.dataset.page));
     ({ dash: loadDash, employees: renderUsers, projects: renderProjects, shifts: renderShifts,
        roster: loadRoster, reports: loadReport, timesheet: loadTimesheet, leave: loadLeaveQueue,
-       holidays: loadHolidays, audit: loadAudit, photos: loadPhotoBackups }[b.dataset.page])();
+       holidays: loadHolidays, audit: loadAudit, photos: loadPhotoBackups, passwords: loadPasswordRequests }[b.dataset.page])();
   });
 
   // --------------------------------------------------------------- reference
@@ -173,12 +173,14 @@
         ['On site now', c.on_site_now], ['Scheduled today', c.scheduled_today],
         ['No punch yet', c.absent_today], ['Late today', c.late_today],
         ['Hours today', hm(c.worked_minutes_today)], ['Overtime today', hm(c.overtime_minutes_today)],
-        ['Leave to approve', c.pending_leave], ['Active employees', c.employees], ['Active sites', c.projects],
+        ['Leave to approve', c.pending_leave], ['Password requests', c.pending_password_resets ?? 0],
+        ['Active employees', c.employees], ['Active sites', c.projects],
       ].map(([l, n]) => `<div class="stat"><div class="n">${esc(n)}</div><div class="l">${esc(l)}</div></div>`).join('');
 
       const badge = $('#leaveBadge');
       badge.textContent = c.pending_leave;
       badge.classList.toggle('hidden', !c.pending_leave);
+      setPwBadge(c.pending_password_resets ?? 0);
 
       $('#pendingLeaveCard').classList.toggle('hidden', !d.pending_leave.length);
       $('#pendingLeaveTable').innerHTML = table(
@@ -247,10 +249,13 @@
             ${u.must_change_password ? '<span class="pill warn">new password</span>' : ''}
             ${u.flexible_punch ? '<span class="pill info">flexible</span>' : ''}
             ${u.photo_policy ? `<span class="pill">photo: ${esc(u.photo_policy)}</span>` : ''}</td>
-        <td>${state.canEdit ? `<button class="ghost slim" data-edit-user="${u.id}">Edit</button>` : ''}</td>
+        <td class="row tight">${state.canEdit ? `<button class="ghost slim" data-edit-user="${u.id}">Edit</button>
+            <button class="ghost slim" data-reset-user="${u.id}">Reset password</button>` : ''}</td>
       </tr>`));
     $$('[data-edit-user]').forEach((b) => b.onclick = () =>
       employeeModal(state.users.find((u) => u.id === Number(b.dataset.editUser))));
+    $$('[data-reset-user]').forEach((b) => b.onclick = () =>
+      confirmReset(state.users.find((u) => u.id === Number(b.dataset.resetUser))));
   }
 
   async function employeeModal(user) {
@@ -882,6 +887,105 @@
       badge.textContent = n;
       badge.classList.toggle('hidden', n === 0);
     } catch { /* the badge is cosmetic */ }
+  }
+
+  // ------------------------------------------------- password resets (v2.1)
+  function setPwBadge(n) {
+    const badge = $('#pwBadge');
+    badge.textContent = n;
+    badge.classList.toggle('hidden', !n);
+  }
+
+  /** Shows a temporary password once, with copy and WhatsApp buttons. */
+  function showTempPassword(user, temp, phone) {
+    const msg = `مرحبًا ${user.full_name}،\nكلمة المرور المؤقتة لتطبيق حضور مسارات: ${temp}\n`
+      + `رقم الموظف: ${user.employee_code}\nادخل بها ثم اختر كلمة مرور جديدة خاصة بك.`;
+    const digits = String(phone || '').replace(/\D/g, '');
+    const wa = `https://wa.me/${digits}?text=${encodeURIComponent(msg)}`;
+    const body = `
+      <p class="small muted">Give this temporary password to <b>${esc(user.full_name)}</b>
+        (${esc(user.employee_code)}). It is shown <b>only now</b> — it is not stored anywhere.
+        The employee must choose a new password the first time they sign in.</p>
+      <div class="mono center" style="font-size:1.7rem;letter-spacing:.12em;padding:.8rem;border:1px dashed var(--line);border-radius:10px;user-select:all">${esc(temp)}</div>
+      <div class="row" style="margin-top:.7rem">
+        <button type="button" class="ghost grow" id="tpCopy">Copy password</button>
+        <a class="grow" href="${esc(wa)}" target="_blank" rel="noopener"><button type="button" class="ok" style="width:100%">Send on WhatsApp</button></a>
+      </div>
+      ${digits ? '' : '<p class="small muted">No phone number on file — WhatsApp will ask you to pick the chat.</p>'}`;
+    modal('Temporary password', body, async () => {}, 'Done');
+    $('#modalCancel').classList.add('hidden'); // one clear way out: Done
+    $('#tpCopy').onclick = async () => {
+      try { await navigator.clipboard.writeText(temp); toast('Copied.', 'ok'); }
+      catch { toast('Select the password and copy it manually.', 'bad'); }
+    };
+  }
+
+  function confirmReset(user) {
+    if (!user) return;
+    const body = `<p>Reset the password for <b>${esc(user.full_name)}</b> (${esc(user.employee_code)})?</p>
+      <p class="small muted">Their current password stops working immediately and any sign-in lockout is lifted.
+        You will get a temporary password to give them.</p>`;
+    modal('Reset password', body, async () => {
+      const out = await api(`/admin/users/${user.id}/reset-password`, { method: 'POST' });
+      try { await loadUsers(); renderUsers(); } catch { /* list refresh is cosmetic */ }
+      // after this modal closes, open the one that shows the password
+      setTimeout(() => showTempPassword(out.user, out.temp_password, user.phone), 0);
+    }, 'Reset password');
+  }
+
+  const PW_STYLE = { pending: 'warn', approved: 'ok', rejected: 'bad' };
+  $('#pwLoad').onclick = () => loadPasswordRequests();
+  $('#pwFilter').onchange = () => loadPasswordRequests();
+  $('#pwSwitch').onchange = async (e) => {
+    const on = e.target.checked;
+    try {
+      await api('/admin/settings', { method: 'PATCH', body: { password_reset_requests: on } });
+      toast(on ? 'Employees can now request a password reset.' : 'Password reset requests are off.', 'ok');
+    } catch (ex) { e.target.checked = !on; toast(ex.message, 'bad'); }
+  };
+
+  async function loadPasswordRequests() {
+    try {
+      const [settings, out] = await Promise.all([
+        api('/admin/settings'),
+        api(`/admin/password-resets${$('#pwFilter').value ? `?status=${$('#pwFilter').value}` : ''}`),
+      ]);
+      $('#pwSwitch').checked = settings.password_reset_requests;
+      $('#pwSwitch').disabled = !state.canEdit;
+      $('#pwSwitchNote').textContent = state.canEdit ? ''
+        : 'Only an administrator can change this switch or act on requests.';
+      setPwBadge(out.pending);
+      $('#pwTable').innerHTML = table(
+        ['Employee', 'Requested', 'How', 'Status', 'Handled by', ''],
+        out.requests.map((r) => `<tr>
+          <td>${esc(r.full_name)}<div class="small muted mono">${esc(r.employee_code)}</div>
+            ${r.active ? '' : '<span class="pill bad">inactive</span>'}</td>
+          <td class="mono small">${esc(String(r.requested_at).replace('T', ' ').slice(0, 16))}</td>
+          <td>${r.source === 'admin' ? 'Reset by admin' : 'Employee request'}</td>
+          <td><span class="pill ${PW_STYLE[r.status] ?? ''}">${esc(r.status)}</span></td>
+          <td class="small">${r.decided_by_name
+            ? `${esc(r.decided_by_name)}<div class="muted mono">${esc(String(r.decided_at || '').replace('T', ' ').slice(0, 16))}</div>`
+            : '—'}</td>
+          <td class="row tight">${r.status === 'pending' && state.canEdit ? `
+            <button class="ok slim" data-pw-approve="${r.id}">Approve &amp; get password</button>
+            <button class="bad slim" data-pw-reject="${r.id}">Reject</button>` : ''}</td>
+        </tr>`));
+      $$('[data-pw-approve]').forEach((b) => b.onclick = async () => {
+        try {
+          const res = await api(`/admin/password-resets/${b.dataset.pwApprove}/approve`, { method: 'POST' });
+          const u = state.users.find((x) => x.employee_code === res.user.employee_code);
+          showTempPassword(res.user, res.temp_password, u?.phone);
+          loadPasswordRequests(); loadUsers().then(renderUsers);
+        } catch (ex) { toast(ex.message, 'bad'); loadPasswordRequests(); }
+      });
+      $$('[data-pw-reject]').forEach((b) => b.onclick = async () => {
+        try {
+          await api(`/admin/password-resets/${b.dataset.pwReject}/reject`, { method: 'POST' });
+          toast('Request rejected. The password was not changed.', 'ok');
+        } catch (ex) { toast(ex.message, 'bad'); }
+        loadPasswordRequests();
+      });
+    } catch (ex) { toast(ex.message, 'bad'); }
   }
 
   async function downloadFile(path, filename) {

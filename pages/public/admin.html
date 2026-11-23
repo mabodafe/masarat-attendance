@@ -44,6 +44,7 @@
     <button data-page="reports" data-i18n="navReports">Attendance &amp; reports</button>
     <button data-page="timesheet" data-i18n="navTimesheet">Timesheet</button>
     <button data-page="leave"><span data-i18n="tabLeave">Leave</span> <span id="leaveBadge" class="pill warn hidden"></span></button>
+    <button data-page="passwords"><span data-i18n="navPasswords">Password requests</span> <span id="pwBadge" class="pill warn hidden"></span></button>
     <button data-page="holidays" data-i18n="navHolidays">Holidays</button>
     <button data-page="audit" data-i18n="navAudit">Punch audit</button>
     <button data-page="photos" data-i18n="navPhotoBackups">Photo backups</button>
@@ -240,6 +241,35 @@
       </div>
     </div>
     <div class="card flush"><div class="tablewrap"><table id="lqTable"></table></div></div>
+  </main>
+
+  <!-- ---------------- password requests (v2.1) ---------------- -->
+  <main id="pagePasswords" class="hidden">
+    <div class="card">
+      <h2 data-i18n="pwTitle">Password reset requests</h2>
+      <p class="small muted">Employees who forget their password tap <b>Forgot password?</b> on the sign-in screen.
+        Approving a request creates a temporary password that you give to the employee (in person or WhatsApp).
+        They must choose their own password the first time they sign in with it.
+        You can also reset anyone directly from <b>Employees</b> &rarr; <b>Reset password</b>.</p>
+      <label class="field inline" style="margin:.6rem 0 0">
+        <input type="checkbox" id="pwSwitch">
+        <span data-i18n="pwSwitchLabel">Allow employees to request a password reset from the sign-in screen</span>
+      </label>
+      <div class="small muted" id="pwSwitchNote"></div>
+    </div>
+    <div class="card">
+      <div class="row">
+        <b class="grow">Requests</b>
+        <select id="pwFilter" style="max-width:220px">
+          <option value="pending">Waiting for you</option>
+          <option value="">All (history)</option>
+          <option value="approved">Approved / reset</option>
+          <option value="rejected">Rejected</option>
+        </select>
+        <button class="ghost slim" id="pwLoad">Show</button>
+      </div>
+    </div>
+    <div class="card flush"><div class="tablewrap"><table id="pwTable"></table></div></div>
   </main>
 
   <!-- ---------------- holidays ---------------- -->

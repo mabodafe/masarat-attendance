@@ -49,6 +49,7 @@ import * as XLSX from 'npm:xlsx@0.18.5';
 // trigger a cleanup on demand from the console. See its own file for the
 // full design rationale.
 import * as PHOTO_CLEANUP from '../lib/photoCleanup.ts';
+import * as PR from '../lib/password_reset.ts';
 // PORT NOTE: the original did `require('../config')` inline inside the GET
 // /dashboard handler. Deno has no synchronous require(), so it is a static
 // import here. Same value, same behaviour.
@@ -201,6 +202,11 @@ adminRoutes.patch('/users/:id', adminOnly, async (c) => {
     sets.push('updated_at = ?'); vals.push(T.nowIso());
     await run(`UPDATE users SET ${sets.join(', ')} WHERE id = ?`, ...vals, id);
   }
+  // v2.1: a password typed in the Edit form also lifts any sign-in lockout.
+  if (b.password) {
+    const u = await get<{ employee_code: string; email: string }>('SELECT employee_code, email FROM users WHERE id = ?', id);
+    if (u) await PR.clearLockouts(u);
+  }
   if (b.project_ids !== undefined) await setMembership(id!, b.project_ids);
   return c.json({
     user: {
@@ -208,6 +214,57 @@ adminRoutes.patch('/users/:id', adminOnly, async (c) => {
       active: !!(await get<Record<string, unknown>>('SELECT active FROM users WHERE id = ?', id))!.active,
     },
   });
+});
+
+// ---------------------------------------------------------------- v2.1: password resets
+// Reading the queue is open to supervisors (read-only admins); acting on it,
+// resetting, and changing the switch are admin-only, like every other write.
+
+adminRoutes.get('/password-resets', async (c) => {
+  const status = c.req.query('status');
+  const allowed = ['pending', 'approved', 'rejected'];
+  return c.json({
+    requests: await PR.list(status && allowed.includes(status) ? status : undefined),
+    pending: await PR.pendingCount(),
+  });
+});
+
+adminRoutes.post('/password-resets/:id/approve', adminOnly, async (c) => {
+  const me = c.get('user') as { id: number };
+  const out = await PR.decide(Number(int(c.req.param('id'))), true, me.id);
+  if (!out.ok) return c.json({ error: out.error }, out.status as 400 | 404);
+  const u = await get<Record<string, unknown>>('SELECT employee_code, full_name FROM users WHERE id = ?', out.user_id);
+  return c.json({ temp_password: out.temp_password, user: u });
+});
+
+adminRoutes.post('/password-resets/:id/reject', adminOnly, async (c) => {
+  const me = c.get('user') as { id: number };
+  const out = await PR.decide(Number(int(c.req.param('id'))), false, me.id);
+  if (!out.ok) return c.json({ error: out.error }, out.status as 400 | 404);
+  return c.json({ ok: true });
+});
+
+adminRoutes.post('/users/:id/reset-password', adminOnly, async (c) => {
+  const me = c.get('user') as { id: number };
+  const id = int(c.req.param('id'));
+  const u = id ? await get<Record<string, unknown>>('SELECT id, employee_code, full_name FROM users WHERE id = ?', id) : null;
+  if (!u) return c.json({ error: 'Employee not found.' }, 404);
+  const temp = await PR.adminReset(id!, me.id);
+  return c.json({ temp_password: temp, user: { employee_code: u.employee_code, full_name: u.full_name } });
+});
+
+adminRoutes.get('/settings', async (c) => {
+  return c.json({ password_reset_requests: await PR.requestsEnabled() });
+});
+
+adminRoutes.patch('/settings', adminOnly, async (c) => {
+  const me = c.get('user') as { id: number };
+  const b = await body(c);
+  if (typeof b.password_reset_requests !== 'boolean') {
+    return c.json({ error: 'password_reset_requests must be true or false.' }, 400);
+  }
+  await PR.setRequestsEnabled(b.password_reset_requests, me.id);
+  return c.json({ password_reset_requests: await PR.requestsEnabled() });
 });
 
 adminRoutes.get('/users/:id/projects', async (c) => {
@@ -1047,6 +1104,7 @@ adminRoutes.get('/dashboard', async (c) => {
       worked_minutes_today: stats.worked || 0,
       overtime_minutes_today: stats.overtime || 0,
       pending_leave: (await get<{ n: number }>("SELECT count(*) AS n FROM leave_requests WHERE status = 'pending'"))!.n,
+      pending_password_resets: await PR.pendingCount(),
     },
     pending_leave: (await LEAVE.list({ status: 'pending' })).slice(0, 20).map(shapeLeave),
     on_site: onSite,

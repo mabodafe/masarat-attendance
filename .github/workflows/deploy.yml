@@ -56,7 +56,7 @@ jobs:
           deno-version: v2.x
 
       - name: Type check
-        run: deno check api/index.ts scripts/seed.ts scripts/import-masarat.ts test/run.ts
+        run: deno check api/index.ts scripts/seed.ts scripts/import-masarat.ts test/run.ts test/password_reset_test.ts
 
       - name: Data layer checks
         run: deno run -A test/db_layer_test.ts
@@ -75,6 +75,12 @@ jobs:
           DATABASE_URL: postgres://masarat:ci-local-only@localhost:5432/masarat_ci
           JWT_SECRET: ci-only-secret-with-enough-variety-Xq7Zk29Lm4
           ALLOW_OUT_OF_FENCE_WITH_FLAG: 'true'
+
+      - name: Password reset checks (v2.1)
+        run: deno run -A test/password_reset_test.ts
+        env:
+          DATABASE_URL: postgres://masarat:ci-local-only@localhost:5432/masarat_ci
+          JWT_SECRET: ci-only-secret-with-enough-variety-Xq7Zk29Lm4
 
       - name: THE GATE — 131 end-to-end checks
         run: deno run -A test/run.ts

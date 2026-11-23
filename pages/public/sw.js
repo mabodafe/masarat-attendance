@@ -1,6 +1,6 @@
 /* Caches the app shell so the screen still opens on a weak site connection.
    API calls are never cached - attendance must always hit the live server. */
-const CACHE = 'hr-shell-v2';
+const CACHE = 'hr-shell-v3'; // bump on every release so phones drop old files
 const SHELL = [
   './', './index.html', './styles.css', './api.js', './app.js', './i18n.js',
   './manifest.json', './logo.svg', './logo-maskable.svg',

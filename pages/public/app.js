@@ -14,7 +14,7 @@
   };
 
   const t = (k) => I18N.t(k);
-  const show = (id) => ['loginView', 'pwdView', 'mainView']
+  const show = (id) => ['loginView', 'forgotView', 'pwdView', 'mainView']
     .forEach((v) => $(`#${v}`).classList.toggle('hidden', v !== id));
 
   /** Company-local now, derived from the server clock offset (not the phone's). */
@@ -44,6 +44,41 @@
     } catch (ex) {
       err.textContent = ex.message;
       err.classList.remove('hidden');
+    } finally {
+      busy(btn, false);
+    }
+  });
+
+  // ---------------------------------------------------------- forgot password
+  // The link only shows while the administrator has requests switched on.
+  async function refreshForgotLink() {
+    try {
+      const o = await api('/auth/options');
+      $('#forgotLinkWrap').classList.toggle('hidden', !o.password_reset_requests);
+    } catch { $('#forgotLinkWrap').classList.add('hidden'); }
+  }
+  $('#forgotLink').addEventListener('click', () => {
+    $('#forgotId').value = $('#identifier').value.trim();
+    $('#forgotMsg').classList.add('hidden');
+    show('forgotView');
+  });
+  $('#backToLogin').addEventListener('click', () => show('loginView'));
+  $('#forgotForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = $('#forgotForm button[type=submit]');
+    const msg = $('#forgotMsg');
+    msg.classList.add('hidden');
+    busy(btn, true, t('sendRequest'));
+    const say = (text, kind) => {
+      msg.textContent = text;
+      msg.className = `notice ${kind}`;
+    };
+    try {
+      await api('/auth/forgot-password', { method: 'POST', body: { identifier: $('#forgotId').value.trim() } });
+      say(t('forgotSent'), 'ok');
+    } catch (ex) {
+      say(ex.status === 403 ? t('forgotDisabled') : ex.status === 429 ? t('forgotTooMany') : ex.message, 'bad');
+      if (ex.status === 403) $('#forgotLinkWrap').classList.add('hidden');
     } finally {
       busy(btn, false);
     }
@@ -103,11 +138,11 @@
 
   // ------------------------------------------------------------------ startup
   async function boot() {
-    if (!store.token) return show('loginView');
+    if (!store.token) { refreshForgotLink(); return show('loginView'); }
     let me;
     try {
       me = await api('/auth/me');
-    } catch { return show('loginView'); }
+    } catch { refreshForgotLink(); return show('loginView'); }
 
     store.user = me.user;
     state.tz = me.tz;

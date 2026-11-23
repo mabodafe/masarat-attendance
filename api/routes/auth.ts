@@ -15,6 +15,7 @@ import * as A from '../lib/auth.ts';
 import type { SessionUser } from '../lib/auth.ts';
 import * as T from '../lib/time.ts';
 import config from '../config.ts';
+import * as PR from '../lib/password_reset.ts';
 
 export interface PublicUser {
   id: number;
@@ -127,6 +128,30 @@ authRoutes.post('/change-password', A.requireAuth, async (c) => {
     T.nowIso(),
     user.id,
   );
+  return c.json({ ok: true });
+});
+
+// ---------------------------------------------------------------- v2.1: forgot password
+// Public, so the sign-in screen can decide whether to show "Forgot password?".
+authRoutes.get('/options', async (c) => {
+  return c.json({ password_reset_requests: await PR.requestsEnabled() });
+});
+
+// The employee asks an administrator to reset their password. The answer is the
+// same whether or not the ID exists, so this cannot be used to discover accounts.
+authRoutes.post('/forgot-password', async (c) => {
+  const b = await body(c);
+  const identifier = String(b.identifier ?? '').trim();
+  if (!identifier) return c.json({ error: 'Enter your employee ID or email.' }, 400);
+  if (!await PR.requestsEnabled()) {
+    return c.json({ error: 'Password reset requests are turned off. Please contact your administrator.', code: 'disabled' }, 403);
+  }
+  const key = 'reset:' + A.throttleKey(c, identifier);
+  if (await A.isThrottled(key)) {
+    return c.json({ error: 'Too many requests. Try again in 15 minutes.' }, 429);
+  }
+  await A.noteFailure(key); // every request counts towards the limit
+  await PR.createRequest(identifier);
   return c.json({ ok: true });
 });
 

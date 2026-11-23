@@ -34,8 +34,33 @@
       <div id="loginError" class="notice bad hidden" style="margin-bottom:.7rem"></div>
       <button class="primary big" type="submit" data-i18n="signIn">Sign in</button>
     </form>
+    <div class="center small hidden" id="forgotLinkWrap" style="margin-bottom:.8rem">
+      <button class="ghost slim" type="button" id="forgotLink" data-i18n="forgotLink">Forgot password?</button>
+    </div>
     <div class="center small">
       <button class="ghost slim" id="langBtnLogin">العربية / English</button>
+    </div>
+  </main>
+</section>
+
+<!-- ======================= FORGOT PASSWORD ========================= -->
+<section id="forgotView" class="app hidden">
+  <main style="padding-top:2.4rem">
+    <div class="center">
+      <img src="logo.svg" alt="" class="logo lg" style="margin:0 auto .8rem">
+      <h1 data-i18n="forgotTitle">Forgot your password?</h1>
+      <p class="muted small" data-i18n="forgotHint">Enter your employee ID. Your administrator will get your request and give you a temporary password.</p>
+    </div>
+    <form class="card" id="forgotForm" autocomplete="on">
+      <div class="field">
+        <label for="forgotId" data-i18n="employeeIdOrEmail">Employee ID or email</label>
+        <input id="forgotId" name="username" autocomplete="username" required>
+      </div>
+      <div id="forgotMsg" class="notice hidden" style="margin-bottom:.7rem"></div>
+      <button class="primary big" type="submit" data-i18n="sendRequest">Send request</button>
+    </form>
+    <div class="center small">
+      <button class="ghost slim" type="button" id="backToLogin" data-i18n="backToSignIn">Back to sign in</button>
     </div>
   </main>
 </section>
