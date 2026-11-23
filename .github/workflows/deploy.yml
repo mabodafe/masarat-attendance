@@ -142,7 +142,7 @@ jobs:
       # --no-verify-jwt is REQUIRED: our tokens are this app's own HS256 JWTs, not
       # Supabase JWTs. The app still enforces requireAuth + requireRole on every route.
       - name: Deploy the api function
-        run: supabase functions deploy api --no-verify-jwt
+        run: supabase functions deploy api --no-verify-jwt --yes
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
