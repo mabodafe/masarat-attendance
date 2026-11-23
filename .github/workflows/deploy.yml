@@ -125,14 +125,15 @@ jobs:
           version: latest
 
       - name: Link the project
-        run: supabase link --project-ref "$SUPABASE_PROJECT_REF" --password "$SUPABASE_DB_PASSWORD"
+        run: supabase link --project-ref "$SUPABASE_PROJECT_REF"
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
 
       - name: Apply database migrations
-        run: supabase db push --password "$SUPABASE_DB_PASSWORD"
+        # Newer Supabase CLIs need --remote to target the linked project (Nov 2026).
+        run: supabase db push --remote --password "$SUPABASE_DB_PASSWORD"
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
